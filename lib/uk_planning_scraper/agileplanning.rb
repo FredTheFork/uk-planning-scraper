@@ -7,6 +7,8 @@ require 'uri'
 require 'timeout'                    # ← added for the 15-minute timeout
 require_relative 'application'
 
+DAYS = 7 unless defined?(DAYS)
+
 module UKPlanningScraper
   class AgilePlanningScraper
     def self.scrape(authority, params = {}, options = {})

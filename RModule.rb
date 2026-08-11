@@ -1,8 +1,8 @@
 # systemtest.rb
 require_relative 'lib/uk_planning_scraper/authority'
-require_relative 'lib/uk_planning_scraper/randoms1.rb'
-require_relative 'lib/uk_planning_scraper/randoms2.rb'
-require_relative 'lib/uk_planning_scraper/randoms3.rb'
+require_relative 'lib/uk_planning_scraper/Randoms1.rb'
+require_relative 'lib/uk_planning_scraper/Randoms2.rb'
+require_relative 'lib/uk_planning_scraper/Randoms3.rb'
 require_relative 'lib/uk_planning_scraper/application'
 
 

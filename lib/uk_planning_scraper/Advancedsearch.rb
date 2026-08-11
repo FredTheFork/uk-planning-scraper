@@ -4,6 +4,8 @@ require 'uri'
 require 'timeout'
 require_relative 'application'
 
+DAYS = 7 unless defined?(DAYS)
+
 module UKPlanningScraper
   class AdvancedsearchScraper
     def self.scrape(authority, params = {}, options = {})

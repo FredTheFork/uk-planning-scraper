@@ -1,4 +1,5 @@
 require 'csv'
+require 'date'
 require 'certifi'
 require_relative 'errors'
 
@@ -7,13 +8,6 @@ module UKPlanningScraper
     attr_reader :name 
     attr_reader :url
     attr_reader :system
-      def validated_days(days)
-        today = Date.today
-        from = today - days
-        @scrape_params[:received_from] = from
-        @scrape_params[:received_to] = today
-        self
-      end
 
     def [](key)
       case key.to_sym
@@ -264,7 +258,7 @@ module UKPlanningScraper
     end
 
     def scrape_advancedsearch(params, options)
-      require_relative 'advancedsearch'
+      require_relative 'Advancedsearch'
       UKPlanningScraper::AdvancedsearchScraper.scrape(self, params, options)
     end
 
@@ -290,26 +284,21 @@ module UKPlanningScraper
 
     def scrape_systemni(params, options)
       require_relative 'systemni'
-      UKPlanningScraper::SystemNIScraper.new(self, days: params[:validated_days] || 5, keyword: params[:keywords]).scrape
-    end
-
-    def scrape_camden(params, options)
-      require_relative 'camden'
-      UKPlanningScraper::CamdenScraper.new.scrape(self, days: params[:validated_days] || 30)
+      UKPlanningScraper::SystemNIScraper.new(self, params, options).scrape
     end
 
     def scrape_randoms1(params, options)
-      require_relative 'randoms1'
+      require_relative 'Randoms1'
       UKPlanningScraper::Randoms1Scraper.scrape(self, params, options)
     end
 
     def scrape_randoms2(params, options)
-      require_relative 'randoms2'
+      require_relative 'Randoms2'
       UKPlanningScraper::Randoms2Scraper.scrape(self, params, options)
     end
 
     def scrape_randoms3(params, options)
-      require_relative 'randoms3'
+      require_relative 'Randoms3'
       UKPlanningScraper::Randoms3Scraper.scrape(self, params, options)
     end
 

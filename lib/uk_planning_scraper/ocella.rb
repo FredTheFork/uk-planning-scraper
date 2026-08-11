@@ -6,6 +6,8 @@ require 'uri'
 require 'timeout'                    # ← added for the 15-minute timeout
 #ENV['PLAYWRIGHT_BROWSERS_PATH'] = File.expand_path('../playwright-browsers', __dir__)
 
+DAYS = 7 unless defined?(DAYS)
+
 module UKPlanningScraper
   class OcellaScraper
     def self.scrape(authority, params = {}, options = {})

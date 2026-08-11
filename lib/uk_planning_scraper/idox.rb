@@ -6,10 +6,11 @@ require 'set'
 require 'pp'
 require 'timeout'
 
+DAYS = 7 unless defined?(DAYS)
+
 module UKPlanningScraper
   class Authority
     private
-    keywords = 'wooden window'
     ######################################################################
     # scrape_idox – PublicAccess / Idox
     # ------------------------------------------------------------------

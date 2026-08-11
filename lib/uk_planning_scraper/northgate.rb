@@ -11,6 +11,8 @@ require 'playwright'
 require 'timeout'                    # ← added for the 15-minute timeout
 require_relative 'application'
 
+DAYS = 7 unless defined?(DAYS)
+
 module UKPlanningScraper
   class NorthgateScraper
     def self.scrape(authority)

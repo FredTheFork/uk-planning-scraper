@@ -11,9 +11,9 @@ require_relative 'uk_planning_scraper/arcus'
 require_relative 'uk_planning_scraper/northgate_es'
 require_relative 'uk_planning_scraper/ocella'
 require_relative 'uk_planning_scraper/systemni'
-require_relative 'uk_planning_scraper/randoms1'
-require_relative 'uk_planning_scraper/randoms2'
-require_relative 'uk_planning_scraper/randoms3'
+require_relative 'uk_planning_scraper/Randoms1'
+require_relative 'uk_planning_scraper/Randoms2'
+require_relative 'uk_planning_scraper/Randoms3'
 require 'logger'
 
 module UKPlanningScraper

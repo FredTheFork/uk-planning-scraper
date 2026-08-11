@@ -1,7 +1,10 @@
 # frozen_string_literal: true
 require 'playwright'
 require 'date'
+require 'timeout'
 require_relative 'application'
+
+DAYS = 7 unless defined?(DAYS)
 
 module UKPlanningScraper
   class SystemNIScraper
@@ -266,10 +269,10 @@ module UKPlanningScraper
           end
         end
       rescue Timeout::Error
-        puts "❌ Timeout after 15 minutes while scraping #{@authority.name} (Ocella). " \
+        puts "❌ Timeout after 15 minutes while scraping #{@authority.name} (SystemNI). " \
              "Returning partial results (#{apps.size} applications already collected)."
       rescue Playwright::Error, StandardError => e
-        puts "❌ Unexpected error in Ocella scraper for #{@authority.name}: #{e.class} - #{e.message}"
+        puts "❌ Unexpected error in SystemNI scraper for #{@authority.name}: #{e.class} - #{e.message}"
       end
       puts "✅ Collected #{apps.size} applications"
       apps

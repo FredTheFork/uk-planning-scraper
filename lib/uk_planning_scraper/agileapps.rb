@@ -6,6 +6,8 @@ require 'timeout'                    # ← added
 require 'set'                        # ← added (for Set.new)
 require_relative 'application'
 
+DAYS = 7 unless defined?(DAYS)
+
 module UKPlanningScraper
   class AgileAppsScraper
     BASE_URLS = [
