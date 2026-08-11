@@ -39,7 +39,7 @@ module UKPlanningScraper
       apps = []
       begin
         Timeout.timeout(900) do   # 15 minutes = 900 seconds
-          Playwright.create(playwright_cli_executable_path: 'npx playwright') do |playwright|
+          Playwright.create(playwright_cli_executable_path: Playwright::CLI_EXECUTABLE_PATH) do |playwright|
             playwright.chromium.launch(headless: false) do |browser|
               browser.new_context do |context|
                 page = context.new_page

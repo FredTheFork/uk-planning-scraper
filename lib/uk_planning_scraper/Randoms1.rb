@@ -90,7 +90,7 @@ module UKPlanningScraper
 
       begin
         Timeout.timeout(900) do 
-          Playwright.create(playwright_cli_executable_path: 'npx playwright') do |playwright|
+          Playwright.create(playwright_cli_executable_path: Playwright::CLI_EXECUTABLE_PATH) do |playwright|
             browser = playwright.chromium.launch(headless: false)
             page = browser.new_page
 
@@ -231,7 +231,7 @@ module UKPlanningScraper
       results = []
       begin
         Timeout.timeout(900) do 
-          Playwright.create(playwright_cli_executable_path: 'npx playwright') do |playwright|
+          Playwright.create(playwright_cli_executable_path: Playwright::CLI_EXECUTABLE_PATH) do |playwright|
             browser = playwright.chromium.launch(headless: false)
             page = browser.new_page
 
@@ -565,7 +565,7 @@ module UKPlanningScraper
       results = []
       begin
         Timeout.timeout(4000) do 
-          Playwright.create(playwright_cli_executable_path: 'npx playwright') do |playwright|
+          Playwright.create(playwright_cli_executable_path: Playwright::CLI_EXECUTABLE_PATH) do |playwright|
             browser = playwright.chromium.launch(headless: false)
             page = browser.new_page
 
@@ -721,7 +721,7 @@ module UKPlanningScraper
       puts Playwright.methods.sort
       begin
         Timeout.timeout(900) do 
-          Playwright.create(playwright_cli_executable_path: 'npx playwright') do |playwright|
+          Playwright.create(playwright_cli_executable_path: Playwright::CLI_EXECUTABLE_PATH) do |playwright|
             browser = playwright.chromium.launch(headless: false)
             page = browser.new_page
 
@@ -872,7 +872,7 @@ module UKPlanningScraper
       results = []
       begin
         Timeout.timeout(900) do 
-          Playwright.create(playwright_cli_executable_path: 'npx playwright') do |playwright|
+          Playwright.create(playwright_cli_executable_path: Playwright::CLI_EXECUTABLE_PATH) do |playwright|
             browser = playwright.chromium.launch(headless: false)
             page = browser.new_page
 
@@ -993,7 +993,7 @@ module UKPlanningScraper
       base_url = authority.url[/^(https?:\/\/[^\/]+)/, 1]
       begin
         Timeout.timeout(900) do 
-          Playwright.create(playwright_cli_executable_path: 'npx playwright') do |playwright|
+          Playwright.create(playwright_cli_executable_path: Playwright::CLI_EXECUTABLE_PATH) do |playwright|
             browser = playwright.chromium.launch(headless: false)
             context = browser.new_context
             page = context.new_page
@@ -1215,7 +1215,7 @@ module UKPlanningScraper
       results = []
       begin
         Timeout.timeout(900) do 
-          Playwright.create(playwright_cli_executable_path: 'npx playwright') do |playwright|
+          Playwright.create(playwright_cli_executable_path: Playwright::CLI_EXECUTABLE_PATH) do |playwright|
             browser = playwright.chromium.launch(headless: false)
             page = browser.new_page
 
@@ -1349,7 +1349,7 @@ module UKPlanningScraper
       require 'cgi'
       begin
         Timeout.timeout(2000) do 
-          Playwright.create(playwright_cli_executable_path: 'npx playwright') do |playwright|
+          Playwright.create(playwright_cli_executable_path: Playwright::CLI_EXECUTABLE_PATH) do |playwright|
             browser = playwright.chromium.launch(headless: false)
             page = browser.new_page
 
@@ -1506,7 +1506,7 @@ module UKPlanningScraper
       results = []
       begin
         Timeout.timeout(900) do 
-          Playwright.create(playwright_cli_executable_path: 'npx playwright') do |playwright|
+          Playwright.create(playwright_cli_executable_path: Playwright::CLI_EXECUTABLE_PATH) do |playwright|
             browser = playwright.chromium.launch(headless: false)
             page = browser.new_page
 
@@ -1777,7 +1777,7 @@ module UKPlanningScraper
                   end
       begin
         Timeout.timeout(900) do 
-          Playwright.create(playwright_cli_executable_path: 'npx playwright') do |playwright|
+          Playwright.create(playwright_cli_executable_path: Playwright::CLI_EXECUTABLE_PATH) do |playwright|
             browser = playwright.chromium.launch(headless: false) # headful for debugging
             page = browser.new_page
 
@@ -1899,7 +1899,7 @@ module UKPlanningScraper
       results = []
       begin
         Timeout.timeout(900) do 
-          Playwright.create(playwright_cli_executable_path: 'npx playwright') do |playwright|
+          Playwright.create(playwright_cli_executable_path: Playwright::CLI_EXECUTABLE_PATH) do |playwright|
             browser = playwright.chromium.launch(headless: false)
             page = browser.new_page
 
@@ -2148,7 +2148,7 @@ module UKPlanningScraper
       to_date   = params[:received_to]   ? Date.parse(params[:received_to])   : today
       begin
         Timeout.timeout(1500) do 
-          Playwright.create(playwright_cli_executable_path: 'npx playwright') do |playwright|
+          Playwright.create(playwright_cli_executable_path: Playwright::CLI_EXECUTABLE_PATH) do |playwright|
             browser = playwright.chromium.launch(headless: false) # visible browser for debugging
             page = browser.new_page
 
@@ -2330,7 +2330,7 @@ module UKPlanningScraper
       to_str   = to.strftime('%d/%m/%Y')
       begin
         Timeout.timeout(900) do 
-          Playwright.create(playwright_cli_executable_path: 'npx playwright') do |playwright|
+          Playwright.create(playwright_cli_executable_path: Playwright::CLI_EXECUTABLE_PATH) do |playwright|
             browser = playwright.chromium.launch(headless: false)
             context = browser.new_context
             page = context.new_page
@@ -2497,7 +2497,7 @@ module UKPlanningScraper
       results = []
       begin
         Timeout.timeout(900) do 
-          Playwright.create(playwright_cli_executable_path: 'npx playwright') do |playwright|
+          Playwright.create(playwright_cli_executable_path: Playwright::CLI_EXECUTABLE_PATH) do |playwright|
             puts "➡️ Launching Playwright for Eastleigh"
             browser = playwright.chromium.launch(headless: false)
             page = browser.new_page
@@ -2788,7 +2788,7 @@ module UKPlanningScraper
       results = []
       begin
         Timeout.timeout(900) do 
-          Playwright.create(playwright_cli_executable_path: 'npx playwright') do |playwright|
+          Playwright.create(playwright_cli_executable_path: Playwright::CLI_EXECUTABLE_PATH) do |playwright|
             browser = playwright.chromium.launch(headless: false) # visible for debugging
             page = browser.new_page
 
@@ -2950,7 +2950,7 @@ module UKPlanningScraper
       results = []
       begin
         Timeout.timeout(900) do 
-          Playwright.create(playwright_cli_executable_path: 'npx playwright') do |playwright|
+          Playwright.create(playwright_cli_executable_path: Playwright::CLI_EXECUTABLE_PATH) do |playwright|
             browser = playwright.chromium.launch(headless: false)
             page = browser.new_page
 
@@ -3141,7 +3141,7 @@ module UKPlanningScraper
       results = []
       begin
         Timeout.timeout(900) do 
-          Playwright.create(playwright_cli_executable_path: 'npx playwright') do |playwright|
+          Playwright.create(playwright_cli_executable_path: Playwright::CLI_EXECUTABLE_PATH) do |playwright|
             browser = playwright.chromium.launch(headless: false)
             page = browser.new_page
 
@@ -3314,7 +3314,7 @@ module UKPlanningScraper
       results = []
       begin
         Timeout.timeout(900) do 
-          Playwright.create(playwright_cli_executable_path: 'npx playwright') do |playwright|
+          Playwright.create(playwright_cli_executable_path: Playwright::CLI_EXECUTABLE_PATH) do |playwright|
             browser = playwright.chromium.launch(headless: false)
             page = browser.new_page
 

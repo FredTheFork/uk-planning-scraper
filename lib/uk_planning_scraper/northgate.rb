@@ -43,7 +43,7 @@ module UKPlanningScraper
       initial_html = nil
 
       # First Playwright block: just to get the initial form (short-lived)
-      Playwright.create(playwright_cli_executable_path: 'npx playwright') do |playwright|
+      Playwright.create(playwright_cli_executable_path: Playwright::CLI_EXECUTABLE_PATH) do |playwright|
         browser = playwright.chromium.launch(headless: false)
         begin
           context = browser.new_context
@@ -79,7 +79,7 @@ module UKPlanningScraper
 
       begin
         Timeout.timeout(900) do   # 15 minutes = 900 seconds
-          Playwright.create(playwright_cli_executable_path: 'npx playwright') do |playwright|
+          Playwright.create(playwright_cli_executable_path: Playwright::CLI_EXECUTABLE_PATH) do |playwright|
             browser = playwright.chromium.launch(headless: false)
             context = browser.new_context
             page = context.new_page
