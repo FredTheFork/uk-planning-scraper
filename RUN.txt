@@ -2,48 +2,73 @@
   UK Planning Scraper - How to Run
 ============================================================
 
-STEP 1: Delete the vendor/bundle folder (fixes permission + path issues)
------------------------------------------------------------------------
-  - Close any terminals, Cursor, or programs using this project
-  - Delete this folder: vendor\bundle
-  - (The project folder name has spaces/parentheses which breaks native
-    gem builds. Using system gems avoids that.)
+PREREQUISITES
+------------------------------------------------------------
+  - Ruby 3.1+ with Devkit (https://rubyinstaller.org)
+  - Node.js 18+ (https://nodejs.org)
+  - Bundler gem:  gem install bundler
 
-STEP 2: Install gems (one-time)
------------------------------------------------------------------------
-  cd "D:\ukplanningscraper (newest update)"
+STEP 1: Install gems (one-time or after Gemfile changes)
+------------------------------------------------------------
+  cd to this project folder
   bundle install
 
-  Gems install to your Ruby directory (C:\Ruby31-x64\...), not the project.
-  This fixes the http_parser.rb build error.
+  If you get permission or path errors:
+    - Delete the vendor\bundle folder
+    - Run bundle install from an Administrator command prompt
+    - Rename the project folder to remove spaces/parentheses
 
-STEP 3: Install Playwright Chromium (one-time, for Ocella/Arcus councils)
------------------------------------------------------------------------
-  IMPORTANT: Unset PLAYWRIGHT_BROWSERS_PATH first if it's set:
-    set PLAYWRIGHT_BROWSERS_PATH=
+STEP 2: Install Playwright Chromium (one-time)
+------------------------------------------------------------
+  set PLAYWRIGHT_BROWSERS_PATH=
+  npx playwright install chromium
 
-  Then run:
-    npx playwright install chromium
+  This downloads ~150MB to the default cache:
+    %USERPROFILE%\AppData\Local\ms-playwright
 
-  Requires Node.js (https://nodejs.org). Downloads ~150MB.
-  Browsers install to default cache (%USERPROFILE%\AppData\Local\ms-playwright).
+  The Ruby Playwright gem (playwright-ruby-client ~> 1.52) and the
+  Node Playwright package (playwright 1.52.0) are version-aligned so
+  both use the same browser driver.
 
-STEP 4: Run the scraper
------------------------------------------------------------------------
+STEP 3: Run the scraper
+------------------------------------------------------------
   bundle exec ruby scrape.rb
 
   Or double-click: run.bat
 
+  run.bat will automatically:
+    - Clear PLAYWRIGHT_BROWSERS_PATH
+    - Run bundle install if gems are missing
+    - Install Chromium if not already cached
+    - Start the scraper
+
 ============================================================
 
-Playwright "Executable doesn't exist" - fix:
-  - scrape.rb now clears PLAYWRIGHT_BROWSERS_PATH so Playwright uses its default cache
-  - Run in a NEW terminal: set PLAYWRIGHT_BROWSERS_PATH=
-  - Then: npx playwright install chromium
-  - If PLAYWRIGHT_BROWSERS_PATH is in System/User env vars, remove it via
-    Control Panel → System → Advanced → Environment Variables
+TROUBLESHOOTING
+------------------------------------------------------------
 
-If you still get errors:
+"Playwright::Transport not initialized" or "create not found":
+  - This is fixed. The compatibility layer now uses the gem's
+    native Playwright.create method. No action needed.
+
+"Executable doesn't exist" / Playwright browser errors:
+  - scrape.rb clears PLAYWRIGHT_BROWSERS_PATH at startup
+  - Run in a NEW terminal:  set PLAYWRIGHT_BROWSERS_PATH=
+  - Then:  npx playwright install chromium
+  - If PLAYWRIGHT_BROWSERS_PATH is in System/User env vars, remove it
+    via Control Panel -> System -> Advanced -> Environment Variables
+
+Gem install failures (http_parser.rb, nokogiri, etc.):
+  - Use Ruby+Devkit (not plain Ruby)
+  - Run bundle install from an Administrator command prompt
   - Rename the project folder to remove spaces: "ukplanningscraper"
-  - Ensure Ruby+Devkit was used (not plain Ruby) - needed for native gems
-  - Run bundle install from an Administrator command prompt if permissions fail
+
+Empty results vs. failures:
+  - The scraper now distinguishes between:
+      * A council with no matching applications (empty but successful)
+      * A council that could not be reached (recorded as failed)
+      * A council whose browser could not start (recorded as failed)
+  - Failed councils are written to retry_authorities.csv with the
+    actual error, and are retried automatically at the end of the run.
+  - A final summary shows successful councils, empty results, and
+    failures separately.

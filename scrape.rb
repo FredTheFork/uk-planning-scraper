@@ -99,12 +99,12 @@ def scrape_authority(auth)
     end
 
     puts "✅ Scraped #{applications.size} applications from #{name}"
-    applications
+    { applications: applications, failed: false }
 
   rescue => e
-    puts "❌ Error scraping #{name}: #{e.class} - #{e.message}"
+    puts "❌ Scrape failed for #{name}: #{e.class} - #{e.message}"
     puts e.backtrace.first
-    []
+    { applications: [], failed: true, error: e }
   end
 end
 
@@ -122,13 +122,12 @@ authorities.each_with_index do |auth, i|
   puts "[#{i + 1}/#{authorities.size}] #{auth[:name]}"
   puts "------------------------------------------------------------"
 
-  apps = scrape_authority(auth)
+  result = scrape_authority(auth)
+  apps = result[:applications]
   total_scraped += apps.size
   all_results.concat(apps)
 
-  if apps.empty?
-    failed_authorities << auth
-  end
+  failed_authorities << auth if result[:failed]
 
   puts "Saved #{apps.size} applications from #{auth[:name]}"
   puts "Running total: #{total_scraped}"
@@ -140,7 +139,7 @@ end
 
 if failed_authorities.any?
   puts "\n============================================================"
-  puts "Detected #{failed_authorities.size} authorities with 0 apps or errors — writing to retry CSV..."
+  puts "Detected #{failed_authorities.size} authorities with scraping errors — writing to retry CSV..."
   puts "============================================================"
 
   CSV.open(RETRY_CSV, 'w') do |csv|
@@ -170,7 +169,8 @@ if failed_authorities.any?
     puts "[Retry #{i + 1}/#{retry_authorities.size}] #{auth[:name]}"
     puts "------------------------------------------------------------"
 
-    apps = scrape_authority(auth)
+    result = scrape_authority(auth)
+    apps = result[:applications]
     total_scraped += apps.size
     all_results.concat(apps)
 

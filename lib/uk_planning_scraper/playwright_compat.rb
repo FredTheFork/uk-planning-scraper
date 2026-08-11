@@ -1,7 +1,7 @@
 # frozen_string_literal: true
-# Compatibility shim for playwright-ruby-client
-# Ensures Playwright::Error, Playwright::TimeoutError, and Playwright.create
-# exist regardless of gem version.
+# Compatibility shim for playwright-ruby-client 1.52+.
+# Ensures Playwright::Error / Playwright::TimeoutError exist and
+# that Playwright.create is callable as a public class method.
 require 'playwright'
 
 module Playwright
@@ -13,47 +13,15 @@ module Playwright
     class TimeoutError < StandardError; end
   end
 
-  # Some versions of the gem don't expose `create` as a module method.
-  # Define it ourselves using the gem's internal classes.
-  unless respond_to?(:create)
-    unless defined?(::Playwright::Execution)
-      class Execution
-        def initialize(connection, playwright, browser = nil)
-          @connection = connection
-          @playwright = playwright
-          @browser = browser
-        end
-
-        def stop
-          @browser&.close
-          @connection.stop
-        end
-
-        attr_reader :playwright, :browser
-      end
-    end
-
-    module_function def create(playwright_cli_executable_path:, &block)
-      transport = Transport.new(playwright_cli_executable_path: playwright_cli_executable_path)
-      connection = Connection.new(transport)
-      connection.async_run
-      execution =
-        begin
-          playwright = connection.initialize_playwright
-          Execution.new(connection, PlaywrightApi.wrap(playwright))
-        rescue
-          connection.stop
-          raise
-        end
-      if block
-        begin
-          block.call(execution.playwright)
-        ensure
-          execution.stop
-        end
-      else
-        execution
-      end
-    end
+  # The gem defines `create` as a module_function (private instance method
+  # + public class method).  Some call sites check `respond_to?(:create)`
+  # which returns false for private methods, so make sure it's public.
+  class << self
+    public :create if method_defined?(:create, true) && !public_methods.include?(:create)
   end
+
+  project_root = File.expand_path('../..', __dir__)
+  playwright_bin = File.join(project_root, 'node_modules', '.bin', 'playwright-core')
+  playwright_bin += '.cmd' if Gem.win_platform? && File.file?("#{playwright_bin}.cmd")
+  CLI_EXECUTABLE_PATH = playwright_bin unless const_defined?(:CLI_EXECUTABLE_PATH, false)
 end
