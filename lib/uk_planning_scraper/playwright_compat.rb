@@ -1,32 +1,8 @@
 # frozen_string_literal: true
-# Compatibility shim for playwright-ruby-client.
-#
-# 1. Loads the playwright-ruby-client gem and verifies that all the
-#    internal classes Playwright.create depends on are actually defined.
-# 2. Ensures Playwright::Error and Playwright::TimeoutError exist.
-# 3. Provides a single, reliable playwright_cli_executable_path so every
-#    scraper calls Playwright.create with the same, correct value.
-# 4. Does NOT override Playwright.create — the gem provides it natively.
-
+# Compatibility shim for playwright-ruby-client
+# Ensures Playwright::Error, Playwright::TimeoutError, and Playwright.create
+# exist regardless of gem version.
 require 'playwright'
-
-# The gem's main file should load these, but on some Windows setups the
-# require chain fails partway and leaves Playwright::Transport undefined.
-# Load them explicitly and hard-fail if they're still missing.
-%w[
-  playwright/transport
-  playwright/connection
-  playwright/playwright_api
-].each do |f|
-  begin
-    require f
-  rescue LoadError => e
-    warn "FATAL: could not load '#{f}': #{e.message}"
-    warn "The playwright-ruby-client gem may be incompletely installed."
-    warn "Try: bundle install"
-    raise
-  end
-end
 
 module Playwright
   unless defined?(::Playwright::Error)
@@ -37,38 +13,47 @@ module Playwright
     class TimeoutError < StandardError; end
   end
 
-  # Verify that the gem's internals are loaded. If Transport or Connection
-  # is missing, Playwright.create will fail at runtime with a confusing
-  # NameError. Fail fast here with an actionable message instead.
-  unless defined?(::Playwright::Transport)
-    raise LoadError,
-          "Playwright::Transport is not defined after loading the gem. " \
-          "Reinstall the 'playwright-ruby-client' gem: gem uninstall playwright-ruby-client && bundle install"
-  end
-  unless defined?(::Playwright::Connection)
-    raise LoadError,
-          "Playwright::Connection is not defined after loading the gem. " \
-          "Reinstall the 'playwright-ruby-client' gem: gem uninstall playwright-ruby-client && bundle install"
-  end
+  # Some versions of the gem don't expose `create` as a module method.
+  # Define it ourselves using the gem's internal classes.
+  unless respond_to?(:create)
+    unless defined?(::Playwright::Execution)
+      class Execution
+        def initialize(connection, playwright, browser = nil)
+          @connection = connection
+          @playwright = playwright
+          @browser = browser
+        end
 
-  # Sanity check: the gem must provide Playwright.create.
-  # module_function methods are private, so we check with include_all = true.
-  unless respond_to?(:create, true)
-    raise LoadError,
-          "Playwright.create is not available. The 'playwright-ruby-client' gem " \
-          "may be missing or too old. Run: bundle install"
-  end
+        def stop
+          @browser&.close
+          @connection.stop
+        end
 
-  # Resolve the CLI executable path once at load time.
-  # Prefer the local node_modules/.bin/playwright-core (the gem's recommended
-  # approach), then fall back to playwright, then npx as a last resort.
-  CLI_EXECUTABLE_PATH = begin
-    root = File.expand_path('../../..', __dir__) # project root
-    candidates = [
-      File.join(root, 'node_modules', '.bin', 'playwright-core'),
-      File.join(root, 'node_modules', '.bin', 'playwright'),
-    ]
-    found = candidates.find { |p| File.executable?(p) }
-    found || 'npx playwright'
-  end.freeze
+        attr_reader :playwright, :browser
+      end
+    end
+
+    module_function def create(playwright_cli_executable_path:, &block)
+      transport = Transport.new(playwright_cli_executable_path: playwright_cli_executable_path)
+      connection = Connection.new(transport)
+      connection.async_run
+      execution =
+        begin
+          playwright = connection.initialize_playwright
+          Execution.new(connection, PlaywrightApi.wrap(playwright))
+        rescue
+          connection.stop
+          raise
+        end
+      if block
+        begin
+          block.call(execution.playwright)
+        ensure
+          execution.stop
+        end
+      else
+        execution
+      end
+    end
+  end
 end
