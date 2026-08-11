@@ -8,21 +8,16 @@
 # cache (e.g. %USERPROFILE%\AppData\Local\ms-playwright on Windows).
 ENV.delete('PLAYWRIGHT_BROWSERS_PATH')
 
-# Activate all gems from the Gemfile so that `require 'playwright'`
-# loads the playwright-ruby-client gem (which defines Playwright.create
-# and Playwright::Error) instead of a bare/empty Playwright module.
-require 'bundler/setup'
-
 require_relative 'lib/uk_planning_scraper/postprocess'
 
 require_relative 'lib/uk_planning_scraper/authority'
 require_relative 'lib/uk_planning_scraper/application'
 require_relative 'lib/uk_planning_scraper/authority_scrape_params'
-require_relative 'lib/uk_planning_scraper/Randoms1'
-require_relative 'lib/uk_planning_scraper/Randoms2'
-require_relative 'lib/uk_planning_scraper/Randoms3'
+require_relative 'lib/uk_planning_scraper/randoms1'
+require_relative 'lib/uk_planning_scraper/randoms2'
+require_relative 'lib/uk_planning_scraper/randoms3'
 require_relative 'lib/uk_planning_scraper/idox'
-require_relative 'lib/uk_planning_scraper/Advancedsearch'
+require_relative 'lib/uk_planning_scraper/advancedsearch'
 require_relative 'lib/uk_planning_scraper/agileplanning'
 require_relative 'lib/uk_planning_scraper/agileapps'
 require_relative 'lib/uk_planning_scraper/ocella'
@@ -36,8 +31,8 @@ require 'csv'
 require 'time'
 
 DAYS = 7
-AUTHORITIES_CSV = File.join(__dir__, 'lib', 'uk_planning_scraper', 'authorities.csv')
-RETRY_CSV = File.join(__dir__, 'retry_authorities4 .csv')
+AUTHORITIES_CSV = File.join(__dir__, 'lib/uk_planning_scraper/authorities.csv')
+RETRY_CSV = File.join(__dir__, 'retry_authorities .csv')
 
 # ------------------------------------------------------------
 # LOAD AUTHORITIES
@@ -208,11 +203,11 @@ CSV.open(output_path, 'w') do |csv|
   ]
   all_results.each do |app|
     csv << [
-      app[:authority_name], app[:council_reference],
-      app[:date_received], app[:date_validated], app[:status],
-      app[:decision], app[:date_decision], app[:info_url], app[:address],
-      app[:description], app[:documents_count], app[:documents_url],
-      app[:alternative_reference], app[:appeal_status], app[:appeal_decision]
+      app.authority_name, app.council_reference,
+      app.date_received, app.date_validated, app.status,
+      app.decision, app.date_decision, app.info_url, app.address,
+      app.description, app.documents_count, app.documents_url,
+      app.alternative_reference, app.appeal_status, app.appeal_decision
     ]
   end
 end
