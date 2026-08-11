@@ -1,5 +1,5 @@
 # frozen_string_literal: true
-require 'playwright'
+require_relative 'playwright_compat'
 require 'date'
 require 'timeout'
 require_relative 'application'
@@ -271,7 +271,7 @@ module UKPlanningScraper
       rescue Timeout::Error
         puts "❌ Timeout after 15 minutes while scraping #{@authority.name} (SystemNI). " \
              "Returning partial results (#{apps.size} applications already collected)."
-      rescue Playwright::Error, StandardError => e
+      rescue StandardError => e
         puts "❌ Unexpected error in SystemNI scraper for #{@authority.name}: #{e.class} - #{e.message}"
       end
       puts "✅ Collected #{apps.size} applications"

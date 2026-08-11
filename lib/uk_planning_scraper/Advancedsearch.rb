@@ -1,5 +1,5 @@
 # frozen_string_literal: true
-require 'playwright'
+require_relative 'playwright_compat'
 require 'uri'
 require 'timeout'
 require_relative 'application'
@@ -582,7 +582,7 @@ module UKPlanningScraper
                 page.evaluate("el => el.click()", arg: next_link)
                 page.wait_for_selector(results_query, timeout: 5000)
                 page.wait_for_timeout(1000)
-              rescue Playwright::TimeoutError
+              rescue StandardError
                 puts "⚠️ Timeout or no more results during next page navigation."
                 break
               end
@@ -595,7 +595,7 @@ module UKPlanningScraper
       rescue Timeout::Error
         puts "❌ Timeout after 15 minutes while scraping #{@authority.name} (AdvancedSearch). " \
             "Returning partial results (#{apps.size} applications already collected)."
-      rescue Playwright::Error, StandardError => e
+      rescue StandardError => e
         puts "❌ Unexpected error in AdvancedSearch scraper for #{@authority.name}: #{e.class} - #{e.message}"
       end
 

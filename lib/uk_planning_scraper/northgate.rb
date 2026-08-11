@@ -7,7 +7,7 @@ require 'openssl'
 require 'zlib'
 require 'stringio'
 require 'brotli'
-require 'playwright'
+require_relative 'playwright_compat'
 require 'timeout'                    # ← added for the 15-minute timeout
 require_relative 'application'
 
@@ -153,7 +153,7 @@ module UKPlanningScraper
       rescue Timeout::Error
         puts "❌ Timeout after 15 minutes while scraping #{@authority.name} (Northgate). " \
              "Returning partial results (#{apps.size} applications already collected)."
-      rescue Playwright::Error, StandardError => e
+      rescue StandardError => e
         puts "❌ Unexpected error in Northgate scraper for #{@authority.name}: #{e.class} - #{e.message}"
       end
 

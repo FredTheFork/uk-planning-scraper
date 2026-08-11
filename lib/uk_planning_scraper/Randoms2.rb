@@ -2,7 +2,7 @@
 require 'addressable/uri'
 require 'mechanize'
 require 'date'
-require 'playwright'
+require_relative 'playwright_compat'
 require_relative 'utils'
 require_relative 'application'
 

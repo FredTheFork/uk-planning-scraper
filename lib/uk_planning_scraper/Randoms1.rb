@@ -2,7 +2,7 @@
 require 'addressable/uri'
 require 'mechanize'
 require 'date'
-require 'playwright'
+require_relative 'playwright_compat'
 require_relative 'utils'
 require_relative 'application'
 
@@ -405,7 +405,7 @@ module UKPlanningScraper
                     arg: old_first,
                     timeout: 15_000
                   )
-                rescue Playwright::Error
+                rescue StandardError
                   # fallback — ignore exact text match failure
                 end
 
@@ -2306,7 +2306,7 @@ module UKPlanningScraper
                   puts "ℹ️ No Next button found — pagination complete."
                   break
                 end
-              rescue Playwright::Error => pag_e
+              rescue StandardError => pag_e
                 puts "⚠️ Pagination error: #{pag_e.class} - #{pag_e.message}"
                 break
               end

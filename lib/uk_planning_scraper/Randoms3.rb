@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 require 'mechanize'
 require 'date'
-require 'playwright'
+require_relative 'playwright_compat'
 require_relative 'utils'
 require_relative 'application'
 
@@ -684,7 +684,7 @@ module UKPlanningScraper
                   end
                 end
 
-              rescue Playwright::TimeoutError
+              rescue StandardError
                 puts "⌛ Timeout waiting for results list - checking if on detail page for single result..."
                 if page.locator('button#nav-home-tab').count > 0 || page.locator('button#nav-homem-tab').count > 0
                   puts "✅ Single result detected, scraping detail page directly."

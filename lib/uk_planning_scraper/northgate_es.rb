@@ -1,5 +1,5 @@
 # frozen_string_literal: true
-require 'playwright'
+require_relative 'playwright_compat'
 require 'date'
 require 'time'
 require 'uri'
@@ -74,7 +74,7 @@ module UKPlanningScraper
             # --- Wait for results ---
             begin
               page.wait_for_selector('#divOnlinePlanningSearchResults', timeout: 30_000)
-            rescue Playwright::TimeoutError
+            rescue StandardError
               puts "⚠️ Timeout waiting for results container."
               File.write("debug_output.html", page.content)
               context.close
@@ -131,7 +131,7 @@ module UKPlanningScraper
                   end
 
                   detail_page.close
-                rescue Playwright::TimeoutError
+                rescue StandardError
                   puts "⚠️ Timeout loading details for #{ref}"
                   detail_page.close rescue nil
                 rescue => e
@@ -219,7 +219,7 @@ module UKPlanningScraper
       rescue Timeout::Error
         puts "❌ Timeout after 15 minutes while scraping #{@authority.name} (NorthgateES). " \
              "Returning partial results (#{apps.size} applications already collected)."
-      rescue Playwright::Error, StandardError => e
+      rescue StandardError => e
         puts "❌ Unexpected error in NorthgateES scraper for #{@authority.name}: #{e.class} - #{e.message}"
       end
 

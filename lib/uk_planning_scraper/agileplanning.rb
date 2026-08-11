@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require 'playwright'
+require_relative 'playwright_compat'
 require 'date'
 require 'time'
 require 'uri'
@@ -58,7 +58,7 @@ module UKPlanningScraper
                   return rows.length > 0;
                 }
               JS
-            rescue Playwright::TimeoutError
+            rescue StandardError
               puts "Timeout waiting for results."
               File.write("debug_output.html", page.content)
               context.close
@@ -119,7 +119,7 @@ module UKPlanningScraper
       rescue Timeout::Error
         puts "❌ Timeout after 15 minutes while scraping #{@authority.name} (AgilePlanning). " \
              "Returning partial results (#{apps.size} applications already collected)."
-      rescue Playwright::Error, StandardError => e
+      rescue StandardError => e
         puts "❌ Unexpected error in AgilePlanning scraper for #{@authority.name}: #{e.class} - #{e.message}"
       end
 

@@ -1,5 +1,5 @@
 # frozen_string_literal: true
-require 'playwright'
+require_relative 'playwright_compat'
 require 'date'
 require 'time'
 require 'uri'
@@ -201,7 +201,7 @@ module UKPlanningScraper
       rescue Timeout::Error
         puts "❌ Timeout after 15 minutes while scraping #{@authority.name} (Servlet). " \
              "Returning partial results (#{apps.size} applications already collected)."
-      rescue Playwright::Error, StandardError => e
+      rescue StandardError => e
         puts "❌ Unexpected error in Servlet scraper for #{@authority.name}: #{e.class} - #{e.message}"
       end
       apps

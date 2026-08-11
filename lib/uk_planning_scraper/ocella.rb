@@ -1,5 +1,5 @@
 # frozen_string_literal: true
-require 'playwright'
+require_relative 'playwright_compat'
 require 'date'
 require 'time'
 require 'uri'
@@ -52,7 +52,7 @@ module UKPlanningScraper
             puts "⏳ Waiting for results..."
             begin
               page.wait_for_selector('table tbody tr', timeout: 30_000)
-            rescue Playwright::TimeoutError
+            rescue StandardError
               puts "⚠️ Timeout waiting for results — writing debug_output.html"
               File.write("debug_output.html", page.content)
               context.close
@@ -153,7 +153,7 @@ module UKPlanningScraper
       rescue Timeout::Error
         puts "❌ Timeout after 15 minutes while scraping #{@authority.name} (Ocella). " \
              "Returning partial results (#{apps.size} applications already collected)."
-      rescue Playwright::Error, StandardError => e
+      rescue StandardError => e
         puts "❌ Unexpected error in Ocella scraper for #{@authority.name}: #{e.class} - #{e.message}"
       end
 

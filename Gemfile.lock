@@ -117,7 +117,7 @@ GEM
     nkf (0.1.1)
     nokogiri (1.18.8-x64-mingw-ucrt)
       racc (~> 1.4)
-    playwright-ruby-client (1.57.1)
+    playwright-ruby-client (1.52.0)
       base64
       concurrent-ruby (>= 1.1.6)
       mime-types (>= 3.0)
@@ -258,7 +258,7 @@ DEPENDENCIES
   net-smtp (= 0.3.1.1)
   nkf (= 0.1.1)
   nokogiri (= 1.18.8)
-  playwright-ruby-client (~> 1.57)
+  playwright-ruby-client (~> 1.52)
   power_assert (= 2.0.1)
   prime (= 0.1.2)
   pry (= 0.15.2)

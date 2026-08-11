@@ -1,5 +1,5 @@
 # frozen_string_literal: true
-require 'playwright'
+require_relative 'playwright_compat'
 require 'date'
 require 'uri'
 require 'timeout'                    # ← added
@@ -82,7 +82,7 @@ module UKPlanningScraper
               # Wait for table to load
               begin
                 page.wait_for_selector('tr[ng-repeat="row in $data"]', timeout: 15_000)
-              rescue Playwright::TimeoutError
+              rescue StandardError
                 puts "No more results or page failed to load."
                 break
               end
@@ -162,7 +162,7 @@ module UKPlanningScraper
                     app.info_url = page.url rescue nil
 
                     puts "✅ Scraped full details for #{ref}"
-                  rescue Playwright::TimeoutError => e
+                  rescue StandardError => e
                     puts "⚠️ Timed out loading details for #{ref}: #{e.message}"
                   rescue => e
                     puts "⚠️ Failed to scrape full detail for #{ref}: #{e.class} - #{e.message}"
@@ -245,7 +245,7 @@ module UKPlanningScraper
       rescue Timeout::Error
         puts "❌ Timeout after 15 minutes while scraping #{@authority.name} (AgileApps). " \
              "Returning partial results (#{apps.size} applications already collected)."
-      rescue Playwright::Error, StandardError => e
+      rescue StandardError => e
         puts "❌ Unexpected error in AgileApps scraper for #{@authority.name}: #{e.class} - #{e.message}"
       end
 
