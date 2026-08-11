@@ -64,7 +64,7 @@ GEM
       mutex_m
     i18n (1.14.7)
       concurrent-ruby (~> 1.0)
-    io-console (0.8.0)
+    io-console (0.5.11)
     irb (1.15.2)
       pp (>= 0.6.0)
       rdoc (>= 4.0.0)
@@ -114,7 +114,7 @@ GEM
       digest
       net-protocol
       timeout
-    nkf (0.2.0)
+    nkf (0.1.1)
     nokogiri (1.18.8-x64-mingw-ucrt)
       racc (~> 1.4)
     playwright-ruby-client (1.57.1)
@@ -142,7 +142,7 @@ GEM
       erb
       psych (>= 4.0.0)
     reline (0.6.1)
-      io-console (~> 0.5)
+      io-console (>= 0.5.11)
     rexml (3.4.1)
     rspec (3.13.1)
       rspec-core (~> 3.13.0)
@@ -240,6 +240,7 @@ DEPENDENCIES
   http_parser.rb (= 0.6.0)
   httparty (= 0.23.1)
   i18n (= 1.14.7)
+  io-console (= 0.5.11)
   logger (= 1.7.0)
   matrix (= 0.4.2)
   mechanize (= 2.14.0)
@@ -255,6 +256,7 @@ DEPENDENCIES
   net-imap (= 0.2.4)
   net-pop (= 0.1.1)
   net-smtp (= 0.3.1.1)
+  nkf (= 0.1.1)
   nokogiri (= 1.18.8)
   playwright-ruby-client (~> 1.57)
   power_assert (= 2.0.1)
@@ -262,6 +264,7 @@ DEPENDENCIES
   pry (= 0.15.2)
   rake (= 13.0.6)
   rbs (= 2.7.0)
+  reline (= 0.6.1)
   rexml (= 3.4.1)
   rspec (= 3.13.1)
   rspec-core (= 3.13.4)
