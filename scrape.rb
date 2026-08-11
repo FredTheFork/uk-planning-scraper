@@ -8,6 +8,11 @@
 # cache (e.g. %USERPROFILE%\AppData\Local\ms-playwright on Windows).
 ENV.delete('PLAYWRIGHT_BROWSERS_PATH')
 
+# Activate all gems from the Gemfile so that `require 'playwright'`
+# loads the playwright-ruby-client gem (which defines Playwright.create
+# and Playwright::Error) instead of a bare/empty Playwright module.
+require 'bundler/setup'
+
 require_relative 'lib/uk_planning_scraper/postprocess'
 
 require_relative 'lib/uk_planning_scraper/authority'
