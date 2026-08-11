@@ -1,0 +1,3 @@
+REM Do NOT set PLAYWRIGHT_BROWSERS_PATH - let Playwright use its default cache.
+REM If you previously set it, run: set PLAYWRIGHT_BROWSERS_PATH=
+REM Then: npx playwright install chromium
