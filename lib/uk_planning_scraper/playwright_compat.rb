@@ -1,6 +1,12 @@
 # frozen_string_literal: true
 
-require 'playwright'
+begin
+  require 'playwright'
+rescue LoadError => e
+  raise LoadError,
+        "The 'playwright-ruby-client' gem is not installed. " \
+        "Run: gem install playwright-ruby-client -v 1.52.0\n#{e.message}"
+end
 
 module Playwright
   cli_path = File.expand_path('../../node_modules/.bin/playwright-core', __dir__)
