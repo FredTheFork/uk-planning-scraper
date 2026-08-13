@@ -20,6 +20,7 @@ require 'mime/types/data'
 require 'mime/types'
 require 'open3'
 require 'fileutils'
+require 'json'
 
 # Try vendored gems first, then fall back to system gem.
 vendor_lib = File.expand_path('../../../vendor', __dir__)
@@ -55,8 +56,11 @@ module Playwright
   # Path to the playwright-core CLI binary in node_modules.
   def self.core_cli_path
     base = File.join(NODE_MODULES, '.bin', 'playwright-core')
-    path = "#{base}.cmd" if Gem.win_platform? && File.file?("#{base}.cmd")
-    path || base
+    if Gem.win_platform? && File.file?("#{base}.cmd")
+      "#{base}.cmd"
+    else
+      base
+    end
   end
 
   # Read the version of the currently installed playwright-core package.
@@ -68,12 +72,14 @@ module Playwright
   end
 
   # Ensure the correct playwright-core Node package is installed.
+  # We chdir into PROJECT_ROOT and run `npm install` there, because
+  # `npm install --prefix "path with spaces (parens)"` is unreliable on
+  # Windows — npm truncates the path at spaces/parens and fails with EPERM.
   def self.ensure_matching_playwright_core!
     needed = compatible_cli_version
     installed = installed_core_version
 
     if installed == needed
-      # Already correct — nothing to do.
       return needed
     end
 
@@ -82,15 +88,35 @@ module Playwright
     puts "  Installed:          #{installed || 'none'}"
     puts "  Installing matching playwright-core..."
 
-    cmd = "npm install playwright-core@#{needed} --no-save --prefix \"#{PROJECT_ROOT}\" 2>&1"
-    stdout, status = Open3.capture2e(cmd)
+    # Run npm install from inside the project directory. We pass the
+    # package spec as the sole argument and let npm use the cwd as the
+    # project root. This avoids --prefix path-quoting issues entirely.
+    stdout, status = Dir.chdir(PROJECT_ROOT) do
+      Open3.capture2e('npm', 'install', "playwright-core@#{needed}", '--no-save')
+    end
     puts stdout
 
     unless status.success?
-      raise "Failed to install playwright-core@#{needed}. Run manually: npm install playwright-core@#{needed}"
+      raise <<~MSG
+        Failed to install playwright-core@#{needed}.
+
+        Try running this manually from your project folder:
+            npm install playwright-core@#{needed}
+
+        If that also fails with EPERM, make sure:
+          1. No other program (editor, antivirus) is locking the folder.
+          2. You are running from the project directory (not the drive root).
+          3. Try running the command prompt as Administrator.
+      MSG
     end
 
-    puts "  ✔️ Installed playwright-core@#{needed}"
+    # Verify it actually installed correctly.
+    actual = installed_core_version
+    unless actual == needed
+      raise "Installed playwright-core but version is #{actual}, expected #{needed}."
+    end
+
+    puts "  Installed playwright-core@#{needed} successfully."
     needed
   end
 
