@@ -15,6 +15,7 @@ require_relative 'lib/uk_planning_scraper/playwright_compat'
 # PRE-FLIGHT: Ensure Playwright Chromium browser is installed
 # ------------------------------------------------------------
 require 'open3'
+require 'timeout'
 
 def ensure_playwright_browser!
   cli = Playwright::CLI_EXECUTABLE_PATH
@@ -28,9 +29,17 @@ def ensure_playwright_browser!
   puts ""
 
   unless File.file?(cli)
-    puts "❌ Playwright CLI not found at #{cli}"
+    puts "Playwright CLI not found at #{cli}"
     puts "   Run:  npm install playwright-core@#{gem_version}"
     exit 1
+  end
+
+  # Skip the install entirely if Chromium is already on disk.
+  if Playwright.chromium_installed?
+    puts "Chromium is already installed at:"
+    puts "  #{Playwright.chromium_browser_path}"
+    puts ""
+    return
   end
 
   puts "Ensuring Chromium is installed..."
@@ -39,8 +48,49 @@ def ensure_playwright_browser!
 
   args = ['node', cli, 'install', 'chromium']
 
-  success = system(*args)
+  # Run the install with a timeout. The Node process can hang after download
+  # completes (during extraction) due to antivirus scanning or file locks.
+  # If it times out, we check whether the binary actually landed on disk —
+  # if so, we proceed anyway.
+  pid = Process.spawn(*args)
+  timeout_seconds = 300  # 5 minutes
+
+  begin
+    Timeout.timeout(timeout_seconds) { Process.wait(pid) }
+    success = $?.success?
+  rescue Timeout::Error
+    puts ""
+    puts "Install is taking longer than #{timeout_seconds / 60} minutes..."
+    begin
+      if Gem.win_platform?
+        system("taskkill /F /T /PID #{pid}")
+      else
+        Process.kill('TERM', pid)
+        Process.wait(pid)
+      end
+    rescue
+    end
+
+    if Playwright.chromium_installed?
+      puts "Chromium binary was downloaded successfully despite the timeout."
+      puts "  #{Playwright.chromium_browser_path}"
+      puts ""
+      return
+    else
+      puts "Chromium install did not complete."
+      puts "Try manually:  npx playwright-core install chromium"
+      exit 1
+    end
+  end
+
   unless success
+    if Playwright.chromium_installed?
+      puts ""
+      puts "Chromium is ready (install reported failure but binary exists)."
+      puts "  #{Playwright.chromium_browser_path}"
+      puts ""
+      return
+    end
     puts ""
     puts "Failed to install Chromium automatically."
     puts "Try manually:  npx playwright-core install chromium"

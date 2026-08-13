@@ -61,6 +61,31 @@ module Playwright
     File.join(NODE_MODULES, 'playwright-core', 'cli.js')
   end
 
+  # Path to the Chromium browser binary, based on the playwright-core
+  # package's browsers.json metadata. Returns nil if not found.
+  def self.chromium_browser_path
+    browsers_json = File.join(NODE_MODULES, 'playwright-core', 'browsers.json')
+    return nil unless File.file?(browsers_json)
+    data = JSON.parse(File.read(browsers_json))
+    chromium_entry = data['browsers']&.find { |b| b['name'] == 'chromium' }
+    return nil unless chromium_entry
+    revision = chromium_entry['revision']
+
+    if Gem.win_platform?
+      base = ENV['PLAYWRIGHT_BROWSERS_PATH'] || File.join(ENV['USERPROFILE'] || Dir.home, 'AppData', 'Local', 'ms-playwright')
+      File.join(base, "chromium-#{revision}", 'chrome-win', 'chrome.exe')
+    else
+      base = ENV['PLAYWRIGHT_BROWSERS_PATH'] || File.join(Dir.home, '.cache', 'ms-playwright')
+      File.join(base, "chromium-#{revision}", 'chrome-linux', 'chrome')
+    end
+  end
+
+  # Check if the Chromium browser binary already exists on disk.
+  def self.chromium_installed?
+    path = chromium_browser_path
+    !path.nil? && File.file?(path)
+  end
+
   # Read the version of the currently installed playwright-core package.
   def self.installed_core_version
     pkg = File.join(NODE_MODULES, 'playwright-core', 'package.json')
