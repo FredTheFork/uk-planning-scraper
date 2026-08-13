@@ -8,44 +8,39 @@ PREREQUISITES
   - Node.js 18+ (https://nodejs.org)
   - Bundler gem:  gem install bundler
 
-STEP 1: Install gems (one-time or after Gemfile changes)
+QUICK START
 ------------------------------------------------------------
-  cd to this project folder
-  bundle install
+  1.  bundle install
+  2.  bundle exec ruby scrape.rb
 
-  If you get permission or path errors:
-    - Delete the vendor\bundle folder
-    - Run bundle install from an Administrator command prompt
-    - Rename the project folder to remove spaces/parentheses
+  Or double-click:  run.bat
 
-STEP 2: Install Playwright Chromium (automatic)
+  The scraper automatically:
+    - Detects which playwright-core version the Ruby gem needs
+    - Installs that matching playwright-core via npm (if missing)
+    - Installs the correct Chromium revision (if missing)
+    - Starts scraping
+
+  You do NOT need to manually install browsers.
+  You do NOT need to match versions yourself.
+
+============================================================
+
+HOW IT WORKS (technical detail)
 ------------------------------------------------------------
-  You no longer need to install Chromium manually.
-  scrape.rb will automatically install the correct Chromium
-  revision using the Ruby gem's own bundled CLI at startup.
+  The Ruby gem (playwright-ruby-client) does not bundle a Node CLI.
+  It needs an external `playwright-core` Node package whose version
+  matches the gem's COMPATIBLE_PLAYWRIGHT_VERSION constant.
 
-  The Ruby Playwright gem (playwright-ruby-client 1.52.0) and the
-  Node Playwright package (playwright 1.52.0) are version-aligned.
-  The Gemfile pins the gem to exactly 1.52.0 — do NOT change this
-  to ~> 1.52 or the versions can drift and cause protocol errors.
+  lib/uk_planning_scraper/playwright_compat.rb handles this:
+    1. Loads the Ruby gem
+    2. Reads COMPATIBLE_PLAYWRIGHT_VERSION (e.g. "1.44.0")
+    3. Checks which playwright-core is installed in node_modules
+    4. If mismatched, runs: npm install playwright-core@<version>
+    5. Sets CLI_EXECUTABLE_PATH to node_modules/.bin/playwright-core
 
-  IMPORTANT: The Ruby gem and Node package must be the same version.
-  If the gem is older (e.g. expects chromium-1076) but Node is 1.52.0
-  (expects chromium-1200), you get "Executable doesn't exist" errors.
-  Fix:  bundle update playwright-ruby-client
-  Then delete the ms-playwright cache and let scrape.rb reinstall.
-  scrape.rb now auto-installs Chromium using the same CLI the gem uses.
-
-STEP 3: Run the scraper
-------------------------------------------------------------
-  bundle exec ruby scrape.rb
-
-  Or double-click: run.bat
-
-  run.bat will automatically:
-    - Clear PLAYWRIGHT_BROWSERS_PATH
-    - Run bundle update playwright-ruby-client (ensures pinned 1.52.0)
-    - Start the scraper (which auto-installs the correct Chromium)
+  This means the gem and Node CLI are ALWAYS version-aligned,
+  regardless of which gem version is installed.
 
 ============================================================
 
@@ -54,53 +49,47 @@ TROUBLESHOOTING
 
 ERROR: "Executable doesn't exist at ...chromium-XXXX\chrome.exe"
 ------------------------------------------------------------
-  The Ruby gem cannot find the Chromium browser binary.
+  The Ruby gem and Node playwright-core are mismatched.
 
-  ROOT CAUSE: Ruby gem and Node package are different versions.
-  The Ruby gem expects one Chromium revision (e.g. chromium-1076)
-  but the Node package downloads another (e.g. chromium-1200).
-  This happens when bundle update hasn't been run after pinning.
-
-  FIX:
-    1. Update the gem to match the pinned version:
-         bundle update playwright-ruby-client
-    2. Delete any wrongly-installed browsers:
+  The scraper should auto-fix this. If it doesn't:
+    1. Delete the browser cache:
          rmdir /s /q "%USERPROFILE%\AppData\Local\ms-playwright"
-    3. Run the scraper — it will auto-install the correct revision:
+    2. Delete node_modules and reinstall:
+         rmdir /s /q node_modules
+         npm install
+    3. Run the scraper:
          bundle exec ruby scrape.rb
 
-  ALSO CHECK:
-    - Gem version:  bundle show playwright-ruby-client
-      Must be exactly 1.52.0. If not:  bundle update playwright-ruby-client
-    - Stale PLAYWRIGHT_BROWSERS_PATH system env var:
-      Control Panel > System > Advanced > Environment Variables
-      Delete it if present, then open a NEW command prompt.
+  The scraper will detect the gem's version, install the matching
+  playwright-core, and download the correct Chromium.
+
+ERROR: "Could not locate Gemfile"
+------------------------------------------------------------
+  Your folder path has spaces or parentheses. Make sure you:
+    - cd to the project folder first:  cd /d "I:\ukplanningscraper (newest update)"
+    - Then run:  bundle exec ruby scrape.rb
+  run.bat handles this automatically with setlocal and %~dp0.
 
 ERROR: "timeout: expected float, got undefined"
 ------------------------------------------------------------
-  This is a protocol-level mismatch between the Ruby gem and the
-  Node Playwright CLI. The Ruby gem sends a timeout value that the
-  Node side receives as undefined instead of a number.
+  Same root cause as "Executable doesn't exist" — the gem and
+  Node CLI are subtly mismatched. Follow the same fix steps above.
 
-  Root cause: the Ruby gem and Node CLI are subtly mismatched —
-  even if both say "1.52", a patch-level difference (e.g. gem is
-  1.52.1 but Node is 1.52.0) changes the JSON protocol.
+ERROR: "Failed to download Chromium ... INSTALLATION_COMPLETE does not exist"
+------------------------------------------------------------
+  The download from the CDN failed. This can happen with:
+    - Network/proxy issues
+    - Antivirus blocking the download
+    - Partial download left behind
 
   Fix:
-    1. Confirm gem version:  bundle show playwright-ruby-client
-       Must be exactly 1.52.0.
-    2. Confirm Node version: npx playwright --version
-       Must be exactly 1.52.0.
-    3. If gem is wrong:  bundle update playwright-ruby-client
-       (Gemfile is already pinned to exact 1.52.0)
-    4. If Node is wrong: npm install playwright@1.52.0
-    5. Delete ms-playwright cache, then run the scraper (it will
-       auto-install the correct Chromium via the gem's CLI):
-         rmdir /s /q "%USERPROFILE%\AppData\Local\ms-playwright"
-         bundle exec ruby scrape.rb
-    6. Run:  bundle exec ruby TEST.rb
-       If the timeout error appears here too, it confirms a
-       global version mismatch (not a scraper-code issue).
+    1. Delete the partial download:
+         rmdir /s /q "%USERPROFILE%\AppData\Local\ms-playwright\chromium-1076"
+         (or whichever revision number is shown)
+    2. Retry:  bundle exec ruby scrape.rb
+
+  If it keeps failing, try a different network connection or
+  disable antivirus temporarily for the download.
 
 Empty results vs. failures:
   - The scraper distinguishes between:
@@ -111,3 +100,16 @@ Empty results vs. failures:
     actual error, and are retried automatically at the end of the run.
   - A final summary shows successful councils, empty results, and
     failures separately.
+
+============================================================
+
+MANUAL VERSION ALIGNMENT (if auto-detection fails)
+------------------------------------------------------------
+  1. Find the gem's compatible version:
+       bundle exec ruby -e "require 'playwright'; puts Playwright::COMPATIBLE_PLAYWRIGHT_VERSION"
+  2. Install that exact playwright-core:
+       npm install playwright-core@<version>
+  3. Install Chromium:
+       node_modules\.bin\playwright-core install chromium
+  4. Run the scraper:
+       bundle exec ruby scrape.rb

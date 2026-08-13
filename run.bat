@@ -1,27 +1,21 @@
 @echo off
-cd /d "%~dp0"
+setlocal enableextensions
 
-REM Clear any stale PLAYWRIGHT_BROWSERS_PATH so Playwright uses its default cache
-set PLAYWRIGHT_BROWSERS_PATH=
+REM Use the batch file's own directory (handles spaces and parentheses)
+set "PROJECT_DIR=%~dp0"
+cd /d "%PROJECT_DIR%"
 
-REM Step 1: Ensure gems are installed and updated to pinned versions
-echo Checking gems...
+REM Clear any stale PLAYWRIGHT_BROWSERS_PATH
+set "PLAYWRIGHT_BROWSERS_PATH="
+
+REM Step 1: Ensure gems are installed
 call bundle check >nul 2>&1
 if errorlevel 1 (
     echo Installing gems...
     call bundle install
 )
-echo Ensuring playwright-ruby-client is pinned to 1.52.0...
-call bundle update playwright-ruby-client --quiet
 
-REM Step 2: Delete any mismatched browser cache (chromium-1076 vs chromium-1200)
-REM scrape.rb will auto-install the correct revision on startup.
-if exist "%USERPROFILE%\AppData\Local\ms-playwright\chromium-1076" (
-    echo Found stale chromium-1076 cache. Removing...
-    rmdir /s /q "%USERPROFILE%\AppData\Local\ms-playwright\chromium-1076"
-)
-
-REM Step 3: Run the scraper (it will auto-install the correct Chromium)
+REM Step 2: Run the scraper (auto-installs matching playwright-core + Chromium)
 echo Starting scraper...
 call bundle exec ruby scrape.rb
 pause

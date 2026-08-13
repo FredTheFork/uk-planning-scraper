@@ -6,9 +6,10 @@ require 'playwright'
 require 'open3'
 ENV.delete('PLAYWRIGHT_BROWSERS_PATH')
 
-# Auto-install Chromium using the same CLI the gem uses
+# Auto-install Chromium using the playwright-core CLI
 def ensure_browser!
   cli = Playwright::CLI_EXECUTABLE_PATH
+  puts "Ensuring Chromium is installed..."
   if Gem.win_platform?
     stdout, status = Open3.capture2e("\"#{cli}\" install chromium 2>&1")
   else
@@ -16,7 +17,7 @@ def ensure_browser!
   end
   puts stdout
   unless status.success?
-    puts "Failed to install Chromium. Run manually: npx playwright install chromium"
+    puts "Failed to install Chromium. Run manually: npx playwright-core install chromium"
     exit 1
   end
 end

@@ -19,21 +19,20 @@ require 'open3'
 def ensure_playwright_browser!
   cli = Playwright::CLI_EXECUTABLE_PATH
 
-  # Check version alignment between Ruby gem and Node CLI.
-  gem_version = Playwright::COMPATIBLE_PLAYWRIGHT_VERSION rescue 'unknown'
+  gem_version = Playwright.compatible_cli_version rescue 'unknown'
+  installed = Playwright.installed_core_version rescue 'unknown'
   puts "Playwright version check:"
-  puts "  Ruby gem compatible version: #{gem_version}"
-  puts "  CLI path: #{cli}"
+  puts "  Ruby gem needs:        playwright-core@#{gem_version}"
+  puts "  Installed:             #{installed}"
+  puts "  CLI path:              #{cli}"
   puts ""
 
   unless File.file?(cli)
     puts "❌ Playwright CLI not found at #{cli}"
-    puts "   Run:  npm install"
+    puts "   Run:  npm install playwright-core@#{gem_version}"
     exit 1
   end
 
-  # Install Chromium using the CLI. On Windows, the CLI is a .cmd file
-  # that must be run directly (not via `node`).
   puts "Ensuring Chromium is installed..."
   if Gem.win_platform?
     install_cmd = "\"#{cli}\" install chromium 2>&1"
@@ -45,7 +44,7 @@ def ensure_playwright_browser!
 
   unless status.success?
     puts "❌ Failed to install Chromium."
-    puts "   Try manually:  npx playwright install chromium"
+    puts "   Try manually:  npx playwright-core install chromium"
     exit 1
   end
 
