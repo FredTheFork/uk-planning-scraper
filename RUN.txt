@@ -18,20 +18,23 @@ STEP 1: Install gems (one-time or after Gemfile changes)
     - Run bundle install from an Administrator command prompt
     - Rename the project folder to remove spaces/parentheses
 
-STEP 2: Install Playwright Chromium (one-time)
+STEP 2: Install Playwright Chromium (automatic)
 ------------------------------------------------------------
-  Open a NEW command prompt (so env is clean), then:
-    set PLAYWRIGHT_BROWSERS_PATH=
-    npx playwright install chromium
-
-  This downloads ~150MB to the default cache:
-    %USERPROFILE%\AppData\Local\ms-playwright
+  You no longer need to install Chromium manually.
+  scrape.rb will automatically install the correct Chromium
+  revision using the Ruby gem's own bundled CLI at startup.
 
   The Ruby Playwright gem (playwright-ruby-client 1.52.0) and the
-  Node Playwright package (playwright 1.52.0) are version-aligned so
-  both use the same browser driver. The Gemfile pins the gem to
-  exactly 1.52.0 — do NOT change this to ~> 1.52 or the versions
-  can drift and cause protocol errors.
+  Node Playwright package (playwright 1.52.0) are version-aligned.
+  The Gemfile pins the gem to exactly 1.52.0 — do NOT change this
+  to ~> 1.52 or the versions can drift and cause protocol errors.
+
+  IMPORTANT: The Ruby gem and Node package must be the same version.
+  If the gem is older (e.g. expects chromium-1076) but Node is 1.52.0
+  (expects chromium-1200), you get "Executable doesn't exist" errors.
+  Fix:  bundle update playwright-ruby-client
+  Then delete the ms-playwright cache and let scrape.rb reinstall.
+  scrape.rb now auto-installs Chromium using the same CLI the gem uses.
 
 STEP 3: Run the scraper
 ------------------------------------------------------------
@@ -41,10 +44,8 @@ STEP 3: Run the scraper
 
   run.bat will automatically:
     - Clear PLAYWRIGHT_BROWSERS_PATH
-    - Print both Playwright versions for alignment check
-    - Run bundle install if gems are missing
-    - Install Chromium if not already cached
-    - Start the scraper
+    - Run bundle update playwright-ruby-client (ensures pinned 1.52.0)
+    - Start the scraper (which auto-installs the correct Chromium)
 
 ============================================================
 
@@ -53,39 +54,27 @@ TROUBLESHOOTING
 
 ERROR: "Executable doesn't exist at ...chromium-XXXX\chrome.exe"
 ------------------------------------------------------------
-  The Ruby gem cannot find the Chromium browser binary. Causes:
+  The Ruby gem cannot find the Chromium browser binary.
 
-  1. Chromium was never downloaded, or the download silently failed.
-     - Delete the entire ms-playwright cache:
+  ROOT CAUSE: Ruby gem and Node package are different versions.
+  The Ruby gem expects one Chromium revision (e.g. chromium-1076)
+  but the Node package downloads another (e.g. chromium-1200).
+  This happens when bundle update hasn't been run after pinning.
+
+  FIX:
+    1. Update the gem to match the pinned version:
+         bundle update playwright-ruby-client
+    2. Delete any wrongly-installed browsers:
          rmdir /s /q "%USERPROFILE%\AppData\Local\ms-playwright"
-     - In a NEW command prompt:
-         set PLAYWRIGHT_BROWSERS_PATH=
-         npx playwright install chromium
-     - You should see download progress (~150MB). If you see no
-       output, the download is failing — check your network/proxy.
+    3. Run the scraper — it will auto-install the correct revision:
+         bundle exec ruby scrape.rb
 
-  2. Version mismatch between Ruby gem and Node package.
-     - Run:  bundle show playwright-ruby-client
-       It MUST say 1.52.0 (not 1.52.1 or any other version).
-     - Run:  npx playwright --version
-       It MUST say Version 1.52.0.
-     - If they differ, the Gemfile is already pinned to 1.52.0.
-       Run:  bundle update playwright-ruby-client
-       Then delete the ms-playwright cache and reinstall Chromium
-       (the browser revision number changes between Playwright
-       versions, so old binaries will not work with a new version).
-
-  3. Stale PLAYWRIGHT_BROWSERS_PATH system environment variable.
-     - Go to Control Panel > System > Advanced > Environment Variables
-     - If PLAYWRIGHT_BROWSERS_PATH exists in User or System vars,
-       delete it. scrape.rb clears it at runtime, but a system-level
-       variable can still override in some cases.
-     - Open a NEW command prompt after removing it.
-
-  4. Stale lib\playwright-browsers\ folder (now deleted).
-     - This folder contained a link file pointing to a path from
-       a previous machine (D:\ukplanningscraper...). It has been
-       removed from the project. Do NOT recreate it.
+  ALSO CHECK:
+    - Gem version:  bundle show playwright-ruby-client
+      Must be exactly 1.52.0. If not:  bundle update playwright-ruby-client
+    - Stale PLAYWRIGHT_BROWSERS_PATH system env var:
+      Control Panel > System > Advanced > Environment Variables
+      Delete it if present, then open a NEW command prompt.
 
 ERROR: "timeout: expected float, got undefined"
 ------------------------------------------------------------
@@ -105,9 +94,10 @@ ERROR: "timeout: expected float, got undefined"
     3. If gem is wrong:  bundle update playwright-ruby-client
        (Gemfile is already pinned to exact 1.52.0)
     4. If Node is wrong: npm install playwright@1.52.0
-    5. Delete ms-playwright cache and reinstall Chromium:
+    5. Delete ms-playwright cache, then run the scraper (it will
+       auto-install the correct Chromium via the gem's CLI):
          rmdir /s /q "%USERPROFILE%\AppData\Local\ms-playwright"
-         npx playwright install chromium
+         bundle exec ruby scrape.rb
     6. Run:  bundle exec ruby TEST.rb
        If the timeout error appears here too, it confirms a
        global version mismatch (not a scraper-code issue).

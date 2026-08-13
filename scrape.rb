@@ -8,14 +8,23 @@
 # cache (e.g. %USERPROFILE%\AppData\Local\ms-playwright on Windows).
 ENV.delete('PLAYWRIGHT_BROWSERS_PATH')
 
+# Load Playwright compatibility layer early (defines CLI_EXECUTABLE_PATH)
+require_relative 'lib/uk_planning_scraper/playwright_compat'
+
 # ------------------------------------------------------------
 # PRE-FLIGHT: Ensure Playwright Chromium browser is installed
 # ------------------------------------------------------------
 require 'open3'
 
 def ensure_playwright_browser!
-  cli = File.expand_path('node_modules/.bin/playwright', __dir__)
-  cli = "#{cli}.cmd" if Gem.win_platform? && File.file?("#{cli}.cmd")
+  cli = Playwright::CLI_EXECUTABLE_PATH
+
+  # Check version alignment between Ruby gem and Node CLI.
+  gem_version = Playwright::COMPATIBLE_PLAYWRIGHT_VERSION rescue 'unknown'
+  puts "Playwright version check:"
+  puts "  Ruby gem compatible version: #{gem_version}"
+  puts "  CLI path: #{cli}"
+  puts ""
 
   unless File.file?(cli)
     puts "❌ Playwright CLI not found at #{cli}"
@@ -23,27 +32,25 @@ def ensure_playwright_browser!
     exit 1
   end
 
-  # Check if Chromium is already installed by asking the CLI for its browser path.
-  # `playwright install --dry-run chromium` exits 0 if installed, non-zero if not.
-  puts "Checking Playwright Chromium installation..."
-  cmd = Gem.win_platform? ? "\"#{cli}\"" : cli
-  stdout, status = Open3.capture2e("#{cmd} install --dry-run chromium 2>&1")
-
-  if status.success?
-    puts "✔️ Playwright Chromium is installed."
-    return
-  end
-
-  puts "Playwright Chromium not found. Installing now (one-time ~150MB download)..."
-  stdout, status = Open3.capture2e("#{cmd} install chromium 2>&1")
-  if status.success?
-    puts "✔️ Playwright Chromium installed successfully."
+  # Install Chromium using the CLI. On Windows, the CLI is a .cmd file
+  # that must be run directly (not via `node`).
+  puts "Ensuring Chromium is installed..."
+  if Gem.win_platform?
+    install_cmd = "\"#{cli}\" install chromium 2>&1"
   else
-    puts "❌ Failed to install Playwright Chromium:"
-    puts stdout
+    install_cmd = "node \"#{cli}\" install chromium 2>&1"
+  end
+  stdout, status = Open3.capture2e(install_cmd)
+  puts stdout
+
+  unless status.success?
+    puts "❌ Failed to install Chromium."
     puts "   Try manually:  npx playwright install chromium"
     exit 1
   end
+
+  puts "✔️ Chromium is ready."
+  puts ""
 end
 
 ensure_playwright_browser!
