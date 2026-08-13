@@ -8,6 +8,46 @@
 # cache (e.g. %USERPROFILE%\AppData\Local\ms-playwright on Windows).
 ENV.delete('PLAYWRIGHT_BROWSERS_PATH')
 
+# ------------------------------------------------------------
+# PRE-FLIGHT: Ensure Playwright Chromium browser is installed
+# ------------------------------------------------------------
+require 'open3'
+
+def ensure_playwright_browser!
+  cli = File.expand_path('node_modules/.bin/playwright', __dir__)
+  cli = "#{cli}.cmd" if Gem.win_platform? && File.file?("#{cli}.cmd")
+
+  unless File.file?(cli)
+    puts "❌ Playwright CLI not found at #{cli}"
+    puts "   Run:  npm install"
+    exit 1
+  end
+
+  # Check if Chromium is already installed by asking the CLI for its browser path.
+  # `playwright install --dry-run chromium` exits 0 if installed, non-zero if not.
+  puts "Checking Playwright Chromium installation..."
+  cmd = Gem.win_platform? ? "\"#{cli}\"" : cli
+  stdout, status = Open3.capture2e("#{cmd} install --dry-run chromium 2>&1")
+
+  if status.success?
+    puts "✔️ Playwright Chromium is installed."
+    return
+  end
+
+  puts "Playwright Chromium not found. Installing now (one-time ~150MB download)..."
+  stdout, status = Open3.capture2e("#{cmd} install chromium 2>&1")
+  if status.success?
+    puts "✔️ Playwright Chromium installed successfully."
+  else
+    puts "❌ Failed to install Playwright Chromium:"
+    puts stdout
+    puts "   Try manually:  npx playwright install chromium"
+    exit 1
+  end
+end
+
+ensure_playwright_browser!
+
 require_relative 'lib/uk_planning_scraper/postprocess'
 
 require_relative 'lib/uk_planning_scraper/authority'
