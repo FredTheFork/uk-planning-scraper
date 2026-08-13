@@ -42,7 +42,7 @@ end
 require 'playwright'
 
 module Playwright
-  PROJECT_ROOT = File.expand_path('../../..', __dir__)
+  PROJECT_ROOT = File.expand_path('../..', __dir__)
   NODE_MODULES = File.join(PROJECT_ROOT, 'node_modules')
 
   # Read the version of playwright-core that this gem was built against.
