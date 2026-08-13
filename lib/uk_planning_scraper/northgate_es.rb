@@ -4,9 +4,7 @@ require 'date'
 require 'time'
 require 'uri'
 require 'set'
-require 'timeout'                    # ← added for the 15-minute timeout
-
-#ENV['PLAYWRIGHT_BROWSERS_PATH'] = File.expand_path('../playwright-browsers', __dir__)
+require 'timeout'
 
 module UKPlanningScraper
   class NorthgateESScraper

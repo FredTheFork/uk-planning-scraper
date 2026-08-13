@@ -5,7 +5,6 @@ require 'time'
 require 'uri'
 require 'tmpdir'
 require 'timeout'
-#ENV['PLAYWRIGHT_BROWSERS_PATH'] = File.expand_path('../playwright-browsers', __dir__)
 
 DAYS = 7 unless defined?(DAYS)
 

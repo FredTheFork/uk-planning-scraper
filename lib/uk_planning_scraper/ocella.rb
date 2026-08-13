@@ -3,8 +3,7 @@ require_relative 'playwright_compat'
 require 'date'
 require 'time'
 require 'uri'
-require 'timeout'                    # ← added for the 15-minute timeout
-#ENV['PLAYWRIGHT_BROWSERS_PATH'] = File.expand_path('../playwright-browsers', __dir__)
+require 'timeout'
 
 DAYS = 7 unless defined?(DAYS)
 
