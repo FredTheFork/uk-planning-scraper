@@ -34,21 +34,21 @@ def ensure_playwright_browser!
   end
 
   puts "Ensuring Chromium is installed..."
-  if Gem.win_platform?
-    install_cmd = "\"#{cli}\" install chromium 2>&1"
-  else
-    install_cmd = "node \"#{cli}\" install chromium 2>&1"
-  end
-  stdout, status = Open3.capture2e(install_cmd)
-  puts stdout
+  puts "(This downloads ~150MB on first run — please be patient)"
+  puts ""
 
-  unless status.success?
-    puts "❌ Failed to install Chromium."
-    puts "   Try manually:  npx playwright-core install chromium"
+  args = ['node', cli, 'install', 'chromium']
+
+  success = system(*args)
+  unless success
+    puts ""
+    puts "Failed to install Chromium automatically."
+    puts "Try manually:  npx playwright-core install chromium"
     exit 1
   end
 
-  puts "✔️ Chromium is ready."
+  puts ""
+  puts "Chromium is ready."
   puts ""
 end
 

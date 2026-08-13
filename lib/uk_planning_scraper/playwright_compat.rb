@@ -53,14 +53,12 @@ module Playwright
     '1.44.0'
   end
 
-  # Path to the playwright-core CLI binary in node_modules.
+  # Path to the playwright-core CLI entry point (cli.js).
+  # We use cli.js directly (invoked via `node`) instead of the .bin/.cmd
+  # wrapper, because Ruby's system() calling a .cmd wrapper on Windows
+  # can hang or fail to pass arguments correctly.
   def self.core_cli_path
-    base = File.join(NODE_MODULES, '.bin', 'playwright-core')
-    if Gem.win_platform? && File.file?("#{base}.cmd")
-      "#{base}.cmd"
-    else
-      base
-    end
+    File.join(NODE_MODULES, 'playwright-core', 'cli.js')
   end
 
   # Read the version of the currently installed playwright-core package.
@@ -92,9 +90,9 @@ module Playwright
     # package spec as the sole argument and let npm use the cwd as the
     # project root. This avoids --prefix path-quoting issues entirely.
     stdout, status = Dir.chdir(PROJECT_ROOT) do
-      Open3.capture2e('npm', 'install', "playwright-core@#{needed}", '--no-save')
+      Open3.capture3('npm', 'install', "playwright-core@#{needed}", '--no-save')
     end
-    puts stdout
+    puts stdout[0]
 
     unless status.success?
       raise <<~MSG

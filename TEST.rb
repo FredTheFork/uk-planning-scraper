@@ -1,25 +1,25 @@
-require_relative 'lib/uk_planning_scraper'
+require_relative 'lib/uk_planning_scraper/playwright_compat'
 require 'pp'
 require 'fileutils'
 require_relative 'lib/uk_planning_scraper/postprocess'
-require 'playwright'
-require 'open3'
 ENV.delete('PLAYWRIGHT_BROWSERS_PATH')
 
-# Auto-install Chromium using the playwright-core CLI
 def ensure_browser!
   cli = Playwright::CLI_EXECUTABLE_PATH
   puts "Ensuring Chromium is installed..."
-  if Gem.win_platform?
-    stdout, status = Open3.capture2e("\"#{cli}\" install chromium 2>&1")
-  else
-    stdout, status = Open3.capture2e("node \"#{cli}\" install chromium 2>&1")
-  end
-  puts stdout
-  unless status.success?
+  puts "(This downloads ~150MB on first run — please be patient)"
+  puts ""
+
+  args = ['node', cli, 'install', 'chromium']
+
+  success = system(*args)
+  unless success
+    puts ""
     puts "Failed to install Chromium. Run manually: npx playwright-core install chromium"
     exit 1
   end
+  puts ""
+  puts "Chromium is ready."
 end
 ensure_browser!
 
