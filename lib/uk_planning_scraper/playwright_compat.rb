@@ -148,8 +148,70 @@ module Playwright
     nil
   end
 
+  # Create a platform-appropriate link (junction on Windows, symlink on Unix).
+  def self.create_platform_link(target, link_path)
+    if File.directory?(link_path) || File.symlink?(link_path)
+      FileUtils.rm_rf(link_path)
+    end
+    if Gem.win_platform?
+      system('cmd', '/c', 'mklink', '/J', link_path, target)
+    else
+      FileUtils.ln_s(target, link_path)
+    end
+    File.symlink?(link_path) || File.directory?(link_path)
+  end
+
+  # Scan the Ruby gem source for hardcoded browser revision numbers.
+  # The playwright-ruby-client gem embeds expected revision numbers in its
+  # compiled JavaScript driver files. We search for chromium-NNNN patterns.
+  def self.find_gem_expected_revisions
+    revisions = []
+    gem_lib = nil
+
+    if defined?(::Playwright::VERSION) && Gem.loaded_specs['playwright-ruby-client']
+      gem_lib = Gem.loaded_specs['playwright-ruby-client'].full_gem_path
+      gem_lib = File.join(gem_lib, 'lib') if gem_lib
+    end
+
+    if gem_lib.nil?
+      vendor = File.join(PROJECT_ROOT, 'vendor', 'playwright-ruby-client', 'lib')
+      gem_lib = vendor if File.directory?(vendor)
+    end
+
+    if gem_lib.nil?
+      $LOAD_PATH.each do |lp|
+        if lp =~ /playwright-ruby-client.*lib\z/
+          gem_lib = lp
+          break
+        end
+      end
+    end
+
+    return revisions unless gem_lib && File.directory?(gem_lib)
+
+    Dir.glob(File.join(gem_lib, '**', '*.js')).each do |js_file|
+      begin
+        content = File.read(js_file)
+        content.scan(/chromium[_-](\d+)/i).each { |m| revisions << m[0] }
+      rescue
+      end
+    end
+
+    Dir.glob(File.join(gem_lib, '**', '*.rb')).each do |rb_file|
+      begin
+        content = File.read(rb_file)
+        content.scan(/chromium[_-]?(\d{3,5})/i).each { |m| revisions << m[0] }
+      rescue
+      end
+    end
+
+    revisions.uniq
+  end
+
   # Create symlinks for ALL missing chromium-* revision directories
   # by pointing them to the directory that has the real binary.
+  # Also creates directories for revisions the gem expects but that
+  # don't exist at all on disk.
   def self.ensure_all_chromium_symlinks!
     base = browsers_base_dir
     return unless File.directory?(base)
@@ -167,6 +229,7 @@ module Playwright
 
     return unless real_dir
 
+    # Link existing empty chromium-* dirs to the real one
     Dir.glob(File.join(base, 'chromium-*')).each do |dir|
       next if File.symlink?(dir)
       next if dir == real_dir
@@ -178,13 +241,24 @@ module Playwright
       end
 
       unless has_binary
-        FileUtils.rm_rf(dir) if File.directory?(dir)
-        if Gem.win_platform?
-          system('cmd', '/c', 'mklink', '/J', dir, real_dir)
+        if create_platform_link(real_dir, dir)
+          puts "  Linked #{dir} -> #{real_dir}"
         else
-          FileUtils.ln_s(real_dir, dir)
+          warn "  WARNING: Failed to link #{dir} -> #{real_dir}"
         end
-        puts "  Linked #{dir} -> #{real_dir}"
+      end
+    end
+
+    # Now check for revisions the gem expects that have NO directory at all
+    gem_revisions = find_gem_expected_revisions
+    gem_revisions.each do |rev|
+      expected_dir = File.join(base, "chromium-#{rev}")
+      next if File.directory?(expected_dir) || File.symlink?(expected_dir)
+
+      if create_platform_link(real_dir, expected_dir)
+        puts "  Created missing link #{expected_dir} -> #{real_dir}"
+      else
+        warn "  WARNING: Failed to create #{expected_dir}"
       end
     end
   end
@@ -566,10 +640,11 @@ module Playwright
     end
   end
 
-  # Monkey-patch BrowserType#launch to always pass executablePath
-  # so Playwright never looks for a revision-specific directory that
-  # might not exist (the gem's expected revision can differ from
-  # the Node playwright-core's browsers.json revision).
+  # Monkey-patch BrowserType#launch AND #launch_persistent_context to
+  # always pass executablePath so Playwright never looks for a revision-
+  # specific directory that might not exist (the gem's expected revision
+  # can differ from the Node playwright-core's browsers.json revision).
+  # Handles both keyword args and positional hash args.
   def self.patch_browser_launch!
     return if @browser_launch_patched
     @browser_launch_patched = true
@@ -577,19 +652,55 @@ module Playwright
     return unless defined?(::Playwright::BrowserType)
 
     browser_type_class = ::Playwright::BrowserType
-    original_launch = browser_type_class.instance_method(:launch)
 
-    browser_type_class.define_method(:launch) do |**opts|
+    inject_exe = lambda do |opts|
       exe_path = ::Playwright.find_any_chromium_binary
       if exe_path && File.file?(exe_path)
-        unless opts.key?(:executablePath) || opts.key?(:executable_path)
-          opts[:executablePath] = exe_path
+        if opts.is_a?(Hash)
+          unless opts.key?(:executablePath) || opts.key?(:executable_path) ||
+                 opts.key?('executablePath') || opts.key?('executable_path')
+            opts[:executablePath] = exe_path
+          end
         end
       end
-      original_launch.bind(self).call(**opts)
+      opts
     end
 
-    puts "Patched BrowserType#launch to use explicit executablePath" if ENV['PW_DEBUG']
+    if browser_type_class.method_defined?(:launch)
+      original_launch = browser_type_class.instance_method(:launch)
+
+      browser_type_class.define_method(:launch) do |*args, **opts|
+        if args.any? && args.first.is_a?(Hash)
+          opts = args.first
+        end
+        inject_exe.call(opts)
+        original_launch.bind(self).call(**opts)
+      end
+    end
+
+    if browser_type_class.method_defined?(:launch_persistent_context)
+      original_lpc = browser_type_class.instance_method(:launch_persistent_context)
+
+      browser_type_class.define_method(:launch_persistent_context) do |*args, **opts|
+        if args.any?
+          if args.size >= 2 && args[1].is_a?(Hash)
+            inject_exe.call(args[1])
+            original_lpc.bind(self).call(args[0], **args[1])
+          elsif args.size >= 1 && args[0].is_a?(Hash)
+            inject_exe.call(args[0])
+            original_lpc.bind(self).call(**args[0])
+          else
+            inject_exe.call(opts)
+            original_lpc.bind(self).call(*args, **opts)
+          end
+        else
+          inject_exe.call(opts)
+          original_lpc.bind(self).call(**opts)
+        end
+      end
+    end
+
+    puts "Patched BrowserType#launch and #launch_persistent_context to use explicit executablePath"
   end
 
   # Run the full browser setup at load time.

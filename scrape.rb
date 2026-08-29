@@ -175,7 +175,7 @@ def scrape_authority(auth)
       applications = authority_obj.scrape
 
     else
-      authority_obj = UKPlanningScraper::Authority.new(name, url)
+      authority_obj = UKPlanningScraper::Authority.named(name)
       authority_obj.validated_days(DAYS)
       applications = authority_obj.scrape
     end
