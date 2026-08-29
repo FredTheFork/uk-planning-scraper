@@ -114,10 +114,15 @@ module Playwright
     # Run npm install from inside the project directory. We pass the
     # package spec as the sole argument and let npm use the cwd as the
     # project root. This avoids --prefix path-quoting issues entirely.
-    stdout, status = Dir.chdir(PROJECT_ROOT) do
+    #
+    # NOTE: Open3.capture3 returns THREE values: [stdout, stderr, status].
+    # We must capture all three, otherwise the status object gets
+    # replaced by the stderr string and .success? crashes.
+    stdout, stderr, status = Dir.chdir(PROJECT_ROOT) do
       Open3.capture3('npm', 'install', "playwright-core@#{needed}", '--no-save')
     end
-    puts stdout[0]
+    puts stdout
+    warn stderr unless stderr.to_s.strip.empty?
 
     unless status.success?
       raise <<~MSG

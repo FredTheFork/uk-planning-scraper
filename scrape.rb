@@ -128,7 +128,7 @@ require 'time'
 
 DAYS = 7
 AUTHORITIES_CSV = File.join(__dir__, 'lib/uk_planning_scraper/authorities.csv')
-RETRY_CSV = File.join(__dir__, 'retry_authorities .csv')
+RETRY_CSV = File.join(__dir__, 'retry_authorities.csv')
 
 # ------------------------------------------------------------
 # LOAD AUTHORITIES
@@ -298,12 +298,15 @@ CSV.open(output_path, 'w') do |csv|
     appeal_status appeal_decision
   ]
   all_results.each do |app|
+    # Authority#scrape returns an array of Hashes (via to_hash), not
+    # Application objects, so we use hash access with symbol keys.
+    h = app.is_a?(Hash) ? app : app.to_hash
     csv << [
-      app.authority_name, app.council_reference,
-      app.date_received, app.date_validated, app.status,
-      app.decision, app.date_decision, app.info_url, app.address,
-      app.description, app.documents_count, app.documents_url,
-      app.alternative_reference, app.appeal_status, app.appeal_decision
+      h[:authority_name], h[:council_reference],
+      h[:date_received], h[:date_validated], h[:status],
+      h[:decision], h[:date_decision], h[:info_url], h[:address],
+      h[:description], h[:documents_count], h[:documents_url],
+      h[:alternative_reference], h[:appeal_status], h[:appeal_decision]
     ]
   end
 end
