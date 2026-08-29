@@ -12,7 +12,11 @@
 #   1. Loads the gem (vendored or system).
 #   2. Reads COMPATIBLE_PLAYWRIGHT_VERSION to find the exact Node CLI version.
 #   3. Ensures playwright-core@<that version> is installed in node_modules.
-#   4. Sets CLI_EXECUTABLE_PATH to the matching playwright-core binary.
+#   4. Sets CLI_EXECUTABLE_PATH to a wrapper that invokes cli.js via node
+#      (fixes Errno::ENOEXEC on Windows where .js files can't be exec'd directly).
+#   5. Creates directory junctions so the gem finds the browser binary
+#      at the revision it expects, even if the actual browser was installed
+#      under a different revision number.
 
 require 'concurrent'
 require 'base64'
@@ -24,6 +28,7 @@ require 'json'
 require 'net/http'
 require 'uri'
 require 'zip'
+require 'open-uri'
 
 # Try vendored gems first, then fall back to system gem.
 vendor_lib = File.expand_path('../../../vendor', __dir__)
@@ -52,40 +57,67 @@ module Playwright
   # @example "1.44.0" or "1.52.0"
   def self.compatible_cli_version
     return COMPATIBLE_PLAYWRIGHT_VERSION if defined?(COMPATIBLE_PLAYWRIGHT_VERSION)
-    # Older gem versions may not define it — fall back to 1.44.0 (chromium-1076).
     '1.44.0'
   end
 
   # Path to the playwright-core CLI entry point (cli.js).
-  # We use cli.js directly (invoked via `node`) instead of the .bin/.cmd
-  # wrapper, because Ruby's system() calling a .cmd wrapper on Windows
-  # can hang or fail to pass arguments correctly.
   def self.core_cli_path
     File.join(NODE_MODULES, 'playwright-core', 'cli.js')
+  end
+
+  # On Windows, the gem tries to execute cli.js directly, which fails with
+  # Errno::ENOEXEC because Windows can't run .js files without node.
+  # We create a .bat wrapper that invokes `node cli.js` and pass that path
+  # to the gem via CLI_EXECUTABLE_PATH.
+  def self.cli_wrapper_path
+    wrapper_dir = File.join(PROJECT_ROOT, 'bin')
+    FileUtils.mkdir_p(wrapper_dir) unless File.directory?(wrapper_dir)
+
+    if Gem.win_platform?
+      wrapper = File.join(wrapper_dir, 'playwright-cli-wrapper.bat')
+      cli = core_cli_path.gsub('/', '\\')
+      unless File.file?(wrapper) && File.read(wrapper) =~ /#{Regexp.escape(cli)}/
+        File.write(wrapper, "@echo off\r\nnode \"#{cli}\" %*\r\n")
+      end
+      wrapper
+    else
+      # On non-Windows, the shebang in cli.js works fine.
+      core_cli_path
+    end
+  end
+
+  # The base directory where Playwright stores browser binaries.
+  def self.browsers_base_dir
+    if Gem.win_platform?
+      ENV['PLAYWRIGHT_BROWSERS_PATH'] || File.join(ENV['USERPROFILE'] || Dir.home, 'AppData', 'Local', 'ms-playwright')
+    else
+      ENV['PLAYWRIGHT_BROWSERS_PATH'] || File.join(Dir.home, '.cache', 'ms-playwright')
+    end
+  end
+
+  # Read the Chromium revision from the installed playwright-core's browsers.json.
+  def self.chromium_revision
+    browsers_json = File.join(NODE_MODULES, 'playwright-core', 'browsers.json')
+    return nil unless File.file?(browsers_json)
+    data = JSON.parse(File.read(browsers_json))
+    chromium_entry = data['browsers']&.find { |b| b['name'] == 'chromium' }
+    chromium_entry ? chromium_entry['revision'] : nil
   end
 
   # Path to the Chromium browser binary, based on the playwright-core
   # package's browsers.json metadata. Returns nil if not found.
   def self.chromium_browser_path
-    browsers_json = File.join(NODE_MODULES, 'playwright-core', 'browsers.json')
-    return nil unless File.file?(browsers_json)
-    data = JSON.parse(File.read(browsers_json))
-    chromium_entry = data['browsers']&.find { |b| b['name'] == 'chromium' }
-    return nil unless chromium_entry
-    revision = chromium_entry['revision']
+    revision = chromium_revision
+    return nil unless revision
+
+    dir = File.join(browsers_base_dir, "chromium-#{revision}")
 
     if Gem.win_platform?
-      base = ENV['PLAYWRIGHT_BROWSERS_PATH'] || File.join(ENV['USERPROFILE'] || Dir.home, 'AppData', 'Local', 'ms-playwright')
-      dir = File.join(base, "chromium-#{revision}")
-      # Try the standard path first
       standard = File.join(dir, 'chrome-win', 'chrome.exe')
       return standard if File.file?(standard)
-      # Fallback: search for chrome.exe anywhere in the revision folder
-      # (extraction may be partial or use a different layout)
       find_chrome_exe(dir)
     else
-      base = ENV['PLAYWRIGHT_BROWSERS_PATH'] || File.join(Dir.home, '.cache', 'ms-playwright')
-      File.join(base, "chromium-#{revision}", 'chrome-linux', 'chrome')
+      File.join(dir, 'chrome-linux', 'chrome')
     end
   end
 
@@ -103,38 +135,33 @@ module Playwright
 
   # Read the Chromium download URL and revision from browsers.json
   def self.chromium_download_info
+    revision = chromium_revision
+    return nil unless revision
+
     browsers_json = File.join(NODE_MODULES, 'playwright-core', 'browsers.json')
-    return nil unless File.file?(browsers_json)
     data = JSON.parse(File.read(browsers_json))
     chromium_entry = data['browsers']&.find { |b| b['name'] == 'chromium' }
-    return nil unless chromium_entry
-    revision = chromium_entry['revision']
 
     if Gem.win_platform?
-      base = ENV['PLAYWRIGHT_BROWSERS_PATH'] || File.join(ENV['USERPROFILE'] || Dir.home, 'AppData', 'Local', 'ms-playwright')
       {
         revision: revision,
         download_url: chromium_entry['downloadURL'] || "https://cdn.playwright.dev/dbazure/download/playwright/builds/chromium/#{revision}/chromium-win64.zip",
-        dest_dir: File.join(base, "chromium-#{revision}"),
-        marker_file: File.join(base, "chromium-#{revision}", 'INSTALLATION_COMPLETE')
+        dest_dir: File.join(browsers_base_dir, "chromium-#{revision}"),
+        marker_file: File.join(browsers_base_dir, "chromium-#{revision}", 'INSTALLATION_COMPLETE')
       }
     else
-      base = ENV['PLAYWRIGHT_BROWSERS_PATH'] || File.join(Dir.home, '.cache', 'ms-playwright')
       {
         revision: revision,
         download_url: chromium_entry['downloadURL'] || "https://cdn.playwright.dev/dbazure/download/playwright/builds/chromium/#{revision}/chromium-linux.zip",
-        dest_dir: File.join(base, "chromium-#{revision}"),
-        marker_file: File.join(base, "chromium-#{revision}", 'INSTALLATION_COMPLETE')
+        dest_dir: File.join(browsers_base_dir, "chromium-#{revision}"),
+        marker_file: File.join(browsers_base_dir, "chromium-#{revision}", 'INSTALLATION_COMPLETE')
       }
     end
   end
 
   # Download and extract Chromium entirely in Ruby, bypassing the Node CLI
   # which hangs during zip extraction on some Windows systems.
-  # Uses open-uri (stdlib) which follows redirects automatically — avoids
-  # the Net::HTTP "read_body called twice" bug on redirect responses.
   def self.install_chromium_ruby!
-    require 'open-uri'
     info = chromium_download_info
     raise "Could not read Chromium download info from browsers.json" unless info
 
@@ -142,10 +169,8 @@ module Playwright
     marker = info[:marker_file]
     download_url = info[:download_url]
 
-    # Already installed?
     return true if chromium_installed?
 
-    # Clean up any partial extraction
     if File.directory?(dest_dir)
       FileUtils.rm_rf(dest_dir)
     end
@@ -157,8 +182,6 @@ module Playwright
     puts "  URL: #{download_url}"
     puts "  Dest: #{dest_dir}"
 
-    # open-uri follows redirects (307 → CDN) automatically and streams
-    # to a Tempfile, calling progress_proc as bytes arrive.
     total = 0
     last_print = [0]
 
@@ -190,7 +213,6 @@ module Playwright
     puts ""
     puts "  Download complete. Extracting..."
 
-    # Extract the zip using rubyzip
     Zip.on_exists_proc = true
     Zip::File.open(zip_path) do |zip_file|
       zip_file.each do |entry|
@@ -200,10 +222,7 @@ module Playwright
       end
     end
 
-    # Clean up the zip
     File.delete(zip_path)
-
-    # Write the marker file Playwright expects
     File.write(marker, Time.now.to_s)
 
     puts "  Extraction complete."
@@ -220,9 +239,8 @@ module Playwright
   end
 
   # Ensure the correct playwright-core Node package is installed.
-  # We chdir into PROJECT_ROOT and run `npm install` there, because
-  # `npm install --prefix "path with spaces (parens)"` is unreliable on
-  # Windows — npm truncates the path at spaces/parens and fails with EPERM.
+  # If the installed version already matches the gem's compatible version,
+  # do nothing. If not, install the matching version.
   def self.ensure_matching_playwright_core!
     needed = compatible_cli_version
     installed = installed_core_version
@@ -236,13 +254,6 @@ module Playwright
     puts "  Installed:          #{installed || 'none'}"
     puts "  Installing matching playwright-core..."
 
-    # Run npm install from inside the project directory. We pass the
-    # package spec as the sole argument and let npm use the cwd as the
-    # project root. This avoids --prefix path-quoting issues entirely.
-    #
-    # NOTE: Open3.capture3 returns THREE values: [stdout, stderr, status].
-    # We must capture all three, otherwise the status object gets
-    # replaced by the stderr string and .success? crashes.
     stdout, stderr, status = Dir.chdir(PROJECT_ROOT) do
       Open3.capture3('npm', 'install', "playwright-core@#{needed}", '--no-save')
     end
@@ -255,15 +266,9 @@ module Playwright
 
         Try running this manually from your project folder:
             npm install playwright-core@#{needed}
-
-        If that also fails with EPERM, make sure:
-          1. No other program (editor, antivirus) is locking the folder.
-          2. You are running from the project directory (not the drive root).
-          3. Try running the command prompt as Administrator.
       MSG
     end
 
-    # Verify it actually installed correctly.
     actual = installed_core_version
     unless actual == needed
       raise "Installed playwright-core but version is #{actual}, expected #{needed}."
@@ -273,12 +278,76 @@ module Playwright
     needed
   end
 
+  # Create directory junctions/symlinks so the gem finds the browser binary
+  # at the revision it expects, even if the actual browser was installed
+  # under a different revision number.
+  #
+  # The gem reads COMPATIBLE_PLAYWRIGHT_VERSION and internally knows which
+  # browser revision it expects (e.g. 1076 for playwright 1.44.0). But the
+  # installed playwright-core may specify a different revision in its
+  # browsers.json (e.g. 1169 for playwright 1.52.0). After ensure_matching_playwright_core!
+  # aligns the package version, the browsers.json should match. But if the
+  # browser was already downloaded under the OLD revision, we need to link
+  # the new revision name to the old directory so the gem finds it.
+  def self.ensure_browser_symlinks!
+    base = browsers_base_dir
+    return unless File.directory?(base)
+
+    actual_revision = chromium_revision
+    return unless actual_revision
+
+    actual_dir = File.join(base, "chromium-#{actual_revision}")
+    actual_binary = File.join(actual_dir, 'chrome-win', 'chrome.exe') if Gem.win_platform?
+    actual_binary ||= File.join(actual_dir, 'chrome-linux', 'chrome') unless Gem.win_platform?
+    actual_binary ||= find_chrome_exe(actual_dir)
+
+    # If the actual browser binary exists, we're good — no symlink needed.
+    return if actual_binary && File.file?(actual_binary)
+
+    # The browser doesn't exist at the expected revision. Scan the base
+    # directory for any chromium-* folder that actually contains a binary,
+    # and create a junction/symlink from the expected revision to it.
+    Dir.glob(File.join(base, 'chromium-*')).each do |existing_dir|
+      next if existing_dir == actual_dir
+
+      binary = if Gem.win_platform?
+        File.join(existing_dir, 'chrome-win', 'chrome.exe')
+      else
+        File.join(existing_dir, 'chrome-linux', 'chrome')
+      end
+      binary = find_chrome_exe(existing_dir) unless File.file?(binary)
+
+      next unless binary && File.file?(binary)
+
+      # Found a real browser in a different revision folder — link it.
+      if File.directory?(actual_dir) || File.symlink?(actual_dir)
+        FileUtils.rm_rf(actual_dir)
+      end
+
+      if Gem.win_platform?
+        # Use mklink /J for directory junctions (doesn't require admin rights)
+        system('cmd', '/c', 'mklink', '/J', actual_dir, existing_dir)
+      else
+        FileUtils.ln_s(existing_dir, actual_dir)
+      end
+
+      puts "  Linked #{actual_dir} -> #{existing_dir}"
+      break
+    end
+  end
+
   # Make sure the correct playwright-core is installed, then set CLI path.
   ensure_matching_playwright_core!
 
-  unless const_defined?(:CLI_EXECUTABLE_PATH, false)
-    CLI_EXECUTABLE_PATH = core_cli_path
+  # Create the wrapper and set CLI_EXECUTABLE_PATH to it.
+  # Use remove_const to override if the gem already defined it.
+  if const_defined?(:CLI_EXECUTABLE_PATH, false)
+    remove_const(:CLI_EXECUTABLE_PATH)
   end
+  CLI_EXECUTABLE_PATH = cli_wrapper_path
+
+  # Create browser symlinks/junctions so the gem finds the browser binary.
+  ensure_browser_symlinks!
 
   unless respond_to?(:create)
     raise <<~MSG
@@ -287,12 +356,7 @@ module Playwright
       The playwright-ruby-client gem could not be loaded properly.
       Possible fixes:
         1. Run:  bundle install
-        2. If using vendored gems, ensure the vendor/ directory exists with:
-           vendor/playwright-ruby-client/lib/playwright.rb
-           vendor/concurrent-ruby/lib/concurrent.rb
-           vendor/base64/lib/base64.rb
-           vendor/mime-types-data/lib/mime/types/data.rb
-           vendor/mime-types/lib/mime/types.rb
+        2. If using vendored gems, ensure the vendor/ directory exists.
         3. Reinstall the gem:  gem install playwright-ruby-client
         4. Always run with:  bundle exec ruby scrape.rb
     MSG

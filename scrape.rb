@@ -28,11 +28,14 @@ def ensure_playwright_browser!
   puts "  CLI path:              #{cli}"
   puts ""
 
-  unless File.file?(cli)
-    puts "Playwright CLI not found at #{cli}"
+  unless File.file?(Playwright.core_cli_path)
+    puts "Playwright CLI not found at #{Playwright.core_cli_path}"
     puts "   Run:  npm install playwright-core@#{gem_version}"
     exit 1
   end
+
+  # Ensure browser symlinks/junctions exist (fixes revision mismatch).
+  Playwright.ensure_browser_symlinks!
 
   # Skip the install entirely if Chromium is already on disk.
   if Playwright.chromium_installed?
@@ -50,6 +53,7 @@ def ensure_playwright_browser!
   # which hangs during zip extraction on some Windows systems).
   begin
     Playwright.install_chromium_ruby!
+    Playwright.ensure_browser_symlinks!
     if Playwright.chromium_installed?
       puts ""
       puts "Chromium is ready (installed via Ruby)."
@@ -63,7 +67,7 @@ def ensure_playwright_browser!
   end
 
   # Fallback: use the Node CLI with a polling loop
-  args = ['node', cli, 'install', 'chromium']
+  args = ['node', Playwright.core_cli_path, 'install', 'chromium']
 
   # Use a polling loop instead of Timeout+Process.wait, which hangs on
   # Windows when the Node process gets stuck during extraction.
@@ -82,6 +86,7 @@ def ensure_playwright_browser!
     # Check if the process finished on its own
     done = Process.waitpid(pid, Process::WNOHANG)
     if done
+      Playwright.ensure_browser_symlinks!
       # Process exited — check if browser is there
       if Playwright.chromium_installed?
         puts ""
@@ -92,6 +97,7 @@ def ensure_playwright_browser!
       else
         # Process finished but browser not found — maybe it's still extracting
         sleep 5
+        Playwright.ensure_browser_symlinks!
         if Playwright.chromium_installed?
           puts ""
           puts "Chromium is ready."
@@ -107,6 +113,7 @@ def ensure_playwright_browser!
     end
 
     # Process still running — check if browser appeared on disk anyway
+    Playwright.ensure_browser_symlinks!
     if Playwright.chromium_installed?
       puts ""
       puts "Chromium binary is ready (download completed)."
@@ -139,6 +146,7 @@ def ensure_playwright_browser!
       rescue
       end
 
+      Playwright.ensure_browser_symlinks!
       if Playwright.chromium_installed?
         puts "Chromium binary was downloaded successfully despite the timeout."
         puts "  #{Playwright.chromium_browser_path}"

@@ -8,6 +8,8 @@ ENV.delete('PLAYWRIGHT_BROWSERS_PATH')
 def ensure_browser!
   cli = Playwright::CLI_EXECUTABLE_PATH
 
+  Playwright.ensure_browser_symlinks!
+
   if Playwright.chromium_installed?
     puts "Chromium is already installed at:"
     puts "  #{Playwright.chromium_browser_path}"
@@ -23,6 +25,7 @@ def ensure_browser!
   # which hangs during zip extraction on some Windows systems).
   begin
     Playwright.install_chromium_ruby!
+    Playwright.ensure_browser_symlinks!
     if Playwright.chromium_installed?
       puts ""
       puts "Chromium is ready (installed via Ruby)."
@@ -36,7 +39,7 @@ def ensure_browser!
   end
 
   # Fallback: use the Node CLI with a polling loop
-  args = ['node', cli, 'install', 'chromium']
+  args = ['node', Playwright.core_cli_path, 'install', 'chromium']
 
   pid = Process.spawn(*args)
   max_wait = 1200
@@ -49,6 +52,7 @@ def ensure_browser!
 
     done = Process.waitpid(pid, Process::WNOHANG)
     if done
+      Playwright.ensure_browser_symlinks!
       if Playwright.chromium_installed?
         sleep 5
       end
@@ -65,6 +69,7 @@ def ensure_browser!
       end
     end
 
+    Playwright.ensure_browser_symlinks!
     if Playwright.chromium_installed?
       puts ""
       puts "Chromium binary is ready (download completed)."
@@ -95,6 +100,7 @@ def ensure_browser!
       rescue
       end
 
+      Playwright.ensure_browser_symlinks!
       if Playwright.chromium_installed?
         puts "Chromium binary was downloaded successfully despite the timeout."
         puts "  #{Playwright.chromium_browser_path}"
