@@ -33,7 +33,7 @@ module UKPlanningScraper
       when /Mole Valley/i
         scrape_mole_valley(authority, params)
       when /East Staffordshire/i
-        scrape_mole_valley(authority, params)
+        scrape_east_staffordshire(authority, params)
       when /North Lincolnshire/i
         scrape_north_lincolnshire(authority, params)
       when /Nuneaton and Bedworth/i
@@ -54,12 +54,12 @@ module UKPlanningScraper
         scrape_somerset_west_and_taunton(authority, params)
 
       else
-        puts "⚠️ No Randoms1 scraper implementation for #{authority.name}"
+        puts "⚠️ No Randoms2 scraper implementation for #{authority.name}"
         []
       end
 
     rescue => e
-      puts "❌ Randoms1Scraper error for #{authority.name}: #{e.class} - #{e.message}"
+      puts "❌ Randoms2Scraper error for #{authority.name}: #{e.class} - #{e.message}"
       puts e.backtrace.first
       []
     end
@@ -759,25 +759,23 @@ module UKPlanningScraper
                   doc_page.close
                 end
 
-                record = UKPlanningScraper::Record.build(
-                  scraped_at:        Time.now,
-                  authority_name:    authority.name,
-                  council_reference: ref_text,
-                  date_received:     date_received,
-                  date_validated:    date_registered,
-                  status:            status_final,
-                  decision:          nil, # not clearly exposed
-                  date_decision:     date_decision,
-                  info_url:          page.url,
-                  address:           full_address || address_text,
-                  description:       proposal || desc_text,
-                  documents_count:   docs_count,
-                  documents_url:     docs_url
-                )
+                app = Application.new
+                app.scraped_at        = Time.now
+                app.authority_name    = authority.name
+                app.council_reference = ref_text
+                app.date_received     = date_received
+                app.date_validated    = date_registered
+                app.status            = status_final
+                app.date_decision     = date_decision
+                app.info_url          = page.url
+                app.address           = full_address || address_text
+                app.description       = proposal || desc_text
+                app.documents_count   = docs_count
+                app.documents_url     = docs_url
 
-                if UKPlanningScraper::Record.valid?(record)
-                  results << record
-                  puts "  → Added application #{record[:council_reference]}"
+                if app.valid?
+                  results << app
+                  puts "  → Added application #{app.council_reference}"
                 else
                   puts "  ⚠️ Skipped invalid record (#{ref_text})"
                 end
@@ -1175,6 +1173,9 @@ module UKPlanningScraper
         end
       end
       results
+    end
+    def self.scrape_east_staffordshire(authority, params)
+      UKPlanningScraper::Randoms1Scraper.scrape_east_staffordshire(authority, params)
     end
     def self.scrape_mole_valley(authority, params)
       puts "🌿 Launching headful browser for Mole Valley..."

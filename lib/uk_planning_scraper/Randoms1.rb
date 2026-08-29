@@ -45,7 +45,7 @@ module UKPlanningScraper
       when /Dorset/i
         scrape_dorset(authority, params)  
       when /East Staffordshire/i
-        scrape_eastleigh(authority, params)  
+        scrape_east_staffordshire(authority, params)
       when /Eastleigh/i
         scrape_eastleigh(authority, params)  
       when /Elmbridge/i
@@ -718,7 +718,6 @@ module UKPlanningScraper
       results = []
       from = params[:validated_from] || params[:received_from] || (Date.today - DAYS)
       to   = params[:validated_to]   || params[:received_to]   || Date.today
-      puts Playwright.methods.sort
       begin
         Timeout.timeout(900) do 
           Playwright.create(playwright_cli_executable_path: Playwright::CLI_EXECUTABLE_PATH) do |playwright|
@@ -2334,7 +2333,6 @@ module UKPlanningScraper
             browser = playwright.chromium.launch(headless: false)
             context = browser.new_context
             page = context.new_page
-            puts "yo wahatshksglkjsghd"
             begin
               page.goto(authority.url)
               page.wait_for_load_state
