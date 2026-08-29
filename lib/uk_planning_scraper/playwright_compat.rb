@@ -73,11 +73,23 @@ module Playwright
 
     if Gem.win_platform?
       base = ENV['PLAYWRIGHT_BROWSERS_PATH'] || File.join(ENV['USERPROFILE'] || Dir.home, 'AppData', 'Local', 'ms-playwright')
-      File.join(base, "chromium-#{revision}", 'chrome-win', 'chrome.exe')
+      dir = File.join(base, "chromium-#{revision}")
+      # Try the standard path first
+      standard = File.join(dir, 'chrome-win', 'chrome.exe')
+      return standard if File.file?(standard)
+      # Fallback: search for chrome.exe anywhere in the revision folder
+      # (extraction may be partial or use a different layout)
+      find_chrome_exe(dir)
     else
       base = ENV['PLAYWRIGHT_BROWSERS_PATH'] || File.join(Dir.home, '.cache', 'ms-playwright')
       File.join(base, "chromium-#{revision}", 'chrome-linux', 'chrome')
     end
+  end
+
+  # Recursively find chrome.exe / chrome binary in a directory
+  def self.find_chrome_exe(dir)
+    return nil unless File.directory?(dir)
+    Dir.glob(File.join(dir, '**', 'chrome{.exe,}')).first
   end
 
   # Check if the Chromium browser binary already exists on disk.

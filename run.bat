@@ -39,16 +39,20 @@ if errorlevel 1 (
     exit /b 1
 )
 
-REM Step 3: Try bundle exec first, fall back to plain ruby
+REM Step 3: Run the scraper
 echo Starting scraper...
 echo.
 
-REM Try bundle exec — if it fails, fall back to plain ruby
-call bundle exec ruby scrape.rb
-if errorlevel 1 (
-    echo.
-    echo Bundle exec failed, trying plain ruby...
-    echo.
+REM Use bundle exec if a Gemfile.lock exists, otherwise plain ruby
+if exist "Gemfile.lock" (
+    call bundle exec ruby scrape.rb
+    if errorlevel 1 (
+        echo.
+        echo Bundle exec failed, trying plain ruby...
+        echo.
+        ruby scrape.rb
+    )
+) else (
     ruby scrape.rb
 )
 

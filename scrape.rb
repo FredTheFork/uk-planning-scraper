@@ -51,10 +51,11 @@ def ensure_playwright_browser!
   # Use a polling loop instead of Timeout+Process.wait, which hangs on
   # Windows when the Node process gets stuck during extraction.
   # We check every 5 seconds whether the browser binary has appeared
-  # on disk, and give up after 10 minutes.
+  # on disk, and give up after 20 minutes (extraction of 144MB on slow
+  # Windows disks can take a while).
   pid = Process.spawn(*args)
-  max_wait = 600  # 10 minutes total
-  interval = 5   # check every 5 seconds
+  max_wait = 1200  # 20 minutes total
+  interval = 5    # check every 5 seconds
   waited = 0
 
   loop do

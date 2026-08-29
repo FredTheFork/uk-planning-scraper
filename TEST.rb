@@ -22,7 +22,7 @@ def ensure_browser!
   args = ['node', cli, 'install', 'chromium']
 
   pid = Process.spawn(*args)
-  max_wait = 600
+  max_wait = 1200
   interval = 5
   waited = 0
 
