@@ -176,11 +176,8 @@ module Playwright
     base_url = entry['downloadURL'] || "https://cdn.playwright.dev/dbazure/download/playwright/builds"
 
     # Determine the platform-specific download URL and archive name.
-    if Gem.win_platform?
-      url = "#{base_url}/#{name}/#{revision}/#{name}-win64.zip"
-    else
-      url = "#{base_url}/#{name}/#{revision}/#{name}-linux.zip"
-    end
+    platform_suffix = Gem.win_platform? ? 'win64' : 'linux'
+    url = "#{base_url}/#{name}/#{revision}/#{name}-#{platform_suffix}.zip"
 
     # The directory name convention differs per tool.
     dir_name = case name
@@ -415,10 +412,9 @@ module Playwright
     # Chromium exists — winldd or chromium-headless-shell may still be
     # missing, which causes "Executable doesn't exist" errors at runtime.
     chromium_ok = chromium_installed?
-    headless_shell_ok = chromium_headless_shell_installed?
     winldd_ok = Gem.win_platform? ? winldd_installed? : true
 
-    if chromium_ok && headless_shell_ok && winldd_ok
+    if chromium_ok && winldd_ok
       puts "Chromium is already installed at: #{chromium_browser_path}"
       return
     end
@@ -428,10 +424,9 @@ module Playwright
     ensure_browser_symlinks!
 
     chromium_ok = chromium_installed?
-    headless_shell_ok = chromium_headless_shell_installed?
     winldd_ok = Gem.win_platform? ? winldd_installed? : true
 
-    if chromium_ok && headless_shell_ok && winldd_ok
+    if chromium_ok && winldd_ok
       puts "Chromium linked to existing revision at: #{chromium_browser_path}"
       return
     end
@@ -449,15 +444,14 @@ module Playwright
       end
     end
 
-    unless headless_shell_ok
-      puts "chromium-headless-shell not found. Downloading now..."
+    # chromium-headless-shell is optional — scrapers use headless: false.
+    # Try to install it but don't block if it fails.
+    unless chromium_headless_shell_installed?
+      puts "chromium-headless-shell not found. Attempting download (optional)..."
       begin
         install_tool_ruby!('chromium-headless-shell')
       rescue => e
-        puts "chromium-headless-shell download failed: #{e.class} - #{e.message}"
-        puts "Trying Node CLI..."
-        cli = core_cli_path
-        system('node', cli, 'install', 'chromium-headless-shell') if File.file?(cli)
+        puts "chromium-headless-shell download failed (non-blocking): #{e.class} - #{e.message}"
       end
     end
 
@@ -476,17 +470,17 @@ module Playwright
     # Re-run symlinks in case downloads created new revision folders.
     ensure_browser_symlinks!
 
-    # Final verification.
+    # Final verification — only chromium and winldd are required.
     missing = []
     missing << 'chromium' unless chromium_installed?
-    missing << 'chromium-headless-shell' unless chromium_headless_shell_installed?
     missing << 'winldd' if Gem.win_platform? && !winldd_installed?
 
     if missing.any?
-      warn "WARNING: The following Playwright components could not be installed: #{missing.join(', ')}"
+      warn "WARNING: Required Playwright components could not be installed: #{missing.join(', ')}"
       warn "Run manually: node node_modules/playwright-core/cli.js install"
     else
-      puts "All Playwright components are ready."
+      puts "Chromium is ready at: #{chromium_browser_path}"
+      puts "chromium-headless-shell: #{chromium_headless_shell_installed? ? 'installed' : 'not installed (optional, scrapers use headless: false)'}"
     end
   end
 
