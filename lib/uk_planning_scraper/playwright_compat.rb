@@ -57,7 +57,7 @@ module Playwright
   # @example "1.44.0" or "1.52.0"
   def self.compatible_cli_version
     return COMPATIBLE_PLAYWRIGHT_VERSION if defined?(COMPATIBLE_PLAYWRIGHT_VERSION)
-    '1.44.0'
+    '1.52.0'
   end
 
   # Path to the playwright-core CLI entry point (cli.js).
