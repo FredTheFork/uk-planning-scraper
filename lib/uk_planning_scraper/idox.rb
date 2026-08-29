@@ -72,7 +72,8 @@ module UKPlanningScraper
       # secure agent
       agent = Mechanize.new
       agent.verify_mode = OpenSSL::SSL::VERIFY_PEER
-      agent.ca_file     = ENV['SSL_CERT_FILE'] if ENV['SSL_CERT_FILE'] && File.exist?(ENV['SSL_CERT_FILE'])
+      cacert = File.join(defined?(Playwright::PROJECT_ROOT) ? Playwright::PROJECT_ROOT : File.expand_path('../../', __dir__), 'cacert.pem')
+      agent.ca_file = cacert if File.file?(cacert)
 
       apps = []
 

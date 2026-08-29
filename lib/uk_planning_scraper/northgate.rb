@@ -23,7 +23,8 @@ module UKPlanningScraper
       @authority = authority
       @url = authority.url.chomp('/')
       @uri = URI.parse(@url)
-      ENV['SSL_CERT_FILE'] = File.expand_path('../../cacert.pem', __dir__)
+      cacert = File.join(defined?(Playwright::PROJECT_ROOT) ? Playwright::PROJECT_ROOT : File.expand_path('../../', __dir__), 'cacert.pem')
+      ENV['SSL_CERT_FILE'] = cacert if File.file?(cacert)
     end
 
     def scrape
@@ -175,7 +176,7 @@ module UKPlanningScraper
       req['Accept'] = 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
       req['Accept-Language'] = 'en-GB,en;q=0.9'
 
-      resp = Net::HTTP.start(uri.host, uri.port, use_ssl: uri.scheme == 'https', verify_mode: OpenSSL::SSL::VERIFY_PEER, cert_store: OpenSSL::X509::Store.new.add_file(ENV['SSL_CERT_FILE'])) do |http|
+      resp = Net::HTTP.start(uri.host, uri.port, use_ssl: uri.scheme == 'https', verify_mode: OpenSSL::SSL::VERIFY_PEER, cert_store: ssl_cert_store) do |http|
         http.request(req)
       end
 
@@ -234,7 +235,7 @@ module UKPlanningScraper
       request['Accept-Encoding'] = 'gzip, deflate, br'
       request['Accept'] = 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
       request['Accept-Language'] = 'en-GB,en;q=0.9'
-      response = Net::HTTP.start(uri.host, uri.port, use_ssl: uri.scheme == 'https', verify_mode: OpenSSL::SSL::VERIFY_PEER, cert_store: OpenSSL::X509::Store.new.add_file(ENV['SSL_CERT_FILE'])) do |http|
+      response = Net::HTTP.start(uri.host, uri.port, use_ssl: uri.scheme == 'https', verify_mode: OpenSSL::SSL::VERIFY_PEER, cert_store: ssl_cert_store) do |http|
         http.request(request)
       end
       body = case response['Content-Encoding']
@@ -286,6 +287,14 @@ module UKPlanningScraper
 
     def parse_date(text)
       Date.strptime(text, '%d-%m-%Y') rescue nil
+    end
+
+    def ssl_cert_store
+      store = OpenSSL::X509::Store.new
+      cert_file = ENV['SSL_CERT_FILE']
+      store.add_file(cert_file) if cert_file && File.file?(cert_file)
+      store.set_default_paths
+      store
     end
   end
 end

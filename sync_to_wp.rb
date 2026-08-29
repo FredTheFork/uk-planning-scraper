@@ -16,7 +16,11 @@ require 'optparse'
 require 'base64'
 require 'time'
 require 'logger'
-require 'dotenv/load'
+begin
+  require 'dotenv/load'
+rescue LoadError
+  # dotenv gem not installed — rely on plain ENV vars
+end
 
 options = {
   db: File.join(__dir__, 'data', 'apps.db'),

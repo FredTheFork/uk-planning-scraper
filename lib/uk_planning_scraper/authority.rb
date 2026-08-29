@@ -1,6 +1,6 @@
 require 'csv'
 require 'date'
-require 'certifi'
+require 'openssl'
 require_relative 'errors'
 
 module UKPlanningScraper
