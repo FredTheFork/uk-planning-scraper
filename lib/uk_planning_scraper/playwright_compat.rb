@@ -131,7 +131,10 @@ module Playwright
 
   # Download and extract Chromium entirely in Ruby, bypassing the Node CLI
   # which hangs during zip extraction on some Windows systems.
+  # Uses open-uri (stdlib) which follows redirects automatically — avoids
+  # the Net::HTTP "read_body called twice" bug on redirect responses.
   def self.install_chromium_ruby!
+    require 'open-uri'
     info = chromium_download_info
     raise "Could not read Chromium download info from browsers.json" unless info
 
@@ -154,64 +157,33 @@ module Playwright
     puts "  URL: #{download_url}"
     puts "  Dest: #{dest_dir}"
 
-    # Follow redirects (the CDN returns 307) and stream the body to disk.
-    # Net::HTTP does NOT follow 307/301/302 automatically.
-    current_url = download_url
-    max_redirects = 10
-    total_bytes = 0
-    downloaded_bytes = 0
-    last_print = 0
-    done = false
+    # open-uri follows redirects (307 → CDN) automatically and streams
+    # to a Tempfile, calling progress_proc as bytes arrive.
+    total = 0
+    last_print = [0]
 
-    File.open(zip_path, 'wb') do |f|
-      until done
-        uri = URI(current_url)
-        http = Net::HTTP.new(uri.host, uri.port)
-        http.use_ssl = uri.scheme == 'https'
-        http.read_timeout = 600
-
-        request = Net::HTTP::Get.new(uri)
-        request['User-Agent'] = 'Mozilla/5.0'
-
-        response = http.request(request)
-
-        code = response.code.to_i
-
-        if [301, 302, 303, 307, 308].include?(code)
-          location = response['Location']
-          if location.nil? || location.strip.empty?
-            raise "Download failed: redirect (HTTP #{code}) without Location header"
+    URI.open(download_url, 'rb',
+      'User-Agent' => 'Mozilla/5.0',
+      read_timeout: 600,
+      content_length_proc: ->(len) { total = len.to_i },
+      progress_proc: ->(size) {
+        now = Time.now.to_i
+        if now - last_print[0] >= 3
+          if total > 0
+            pct = (size * 100 / total)
+            print "\r  Downloaded: #{pct}% (#{(size / 1048576.0).round(1)} MB)"
+          else
+            print "\r  Downloaded: #{(size / 1048576.0).round(1)} MB"
           end
-          current_url = location.start_with?('http') ? location : URI.join(current_url, location).to_s
-          puts "  Redirected to: #{current_url}"
-          max_redirects -= 1
-          raise "Download failed: too many redirects" if max_redirects <= 0
-          next
+          last_print[0] = now
         end
-
-        if code != 200
-          raise "Download failed: HTTP #{code}"
-        end
-
-        total_bytes = response['Content-Length'] ? response['Content-Length'].to_i : 0
-        puts "  Size: #{(total_bytes / 1048576.0).round(1)} MB" if total_bytes > 0
-
-        response.read_body do |chunk|
+      }
+    ) do |response|
+      puts "  Size: #{(total / 1048576.0).round(1)} MB" if total > 0
+      File.open(zip_path, 'wb') do |f|
+        while (chunk = response.read(65536))
           f.write(chunk)
-          downloaded_bytes += chunk.size
-          now = Time.now.to_i
-          if now - last_print >= 3
-            if total_bytes > 0
-              pct = (downloaded_bytes * 100 / total_bytes)
-              print "\r  Downloaded: #{pct}% (#{(downloaded_bytes / 1048576.0).round(1)} MB)"
-            else
-              print "\r  Downloaded: #{(downloaded_bytes / 1048576.0).round(1)} MB)"
-            end
-            last_print = now
-          end
         end
-
-        done = true
       end
     end
 
