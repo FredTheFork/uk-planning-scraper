@@ -740,9 +740,13 @@ module Playwright
     @playwright_create_wrapped = true
     original_create = method(:create)
 
-    define_singleton_method(:create) do |*args, &block|
+    define_singleton_method(:create) do |*args, **opts, &block|
       patch_browser_launch!
-      original_create.call(*args, &block)
+      if opts.empty?
+        original_create.call(*args, &block)
+      else
+        original_create.call(*args, **opts, &block)
+      end
     end
   end
 
