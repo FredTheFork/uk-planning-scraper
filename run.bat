@@ -4,10 +4,6 @@ setlocal enableextensions enabledelayedexpansion
 REM ============================================================
 REM  UK Planning Scraper - One-Click Launcher
 REM ============================================================
-REM  This batch file auto-detects the project folder, installs
-REM  any missing gems, and runs the scraper. It handles paths
-REM  with spaces and parentheses automatically.
-REM ============================================================
 
 REM Use the batch file's own directory (handles spaces and parentheses)
 set "PROJECT_DIR=%~dp0"
@@ -43,28 +39,18 @@ if errorlevel 1 (
     exit /b 1
 )
 
-REM Step 3: Ensure gems are installed
-echo Checking gems...
-call bundle check >nul 2>&1
-if errorlevel 1 (
-    echo Installing gems ^(first run only^)...
-    call bundle install
-    if errorlevel 1 (
-        echo.
-        echo ERROR: Bundle install failed. Try running manually:
-        echo   bundle install
-        echo.
-        pause
-        exit /b 1
-    )
-    echo Gems installed successfully.
-    echo.
-)
-
-REM Step 4: Run the scraper
+REM Step 3: Try bundle exec first, fall back to plain ruby
 echo Starting scraper...
 echo.
+
+REM Try bundle exec — if it fails, fall back to plain ruby
 call bundle exec ruby scrape.rb
+if errorlevel 1 (
+    echo.
+    echo Bundle exec failed, trying plain ruby...
+    echo.
+    ruby scrape.rb
+)
 
 echo.
 echo ============================================================

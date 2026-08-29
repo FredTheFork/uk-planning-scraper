@@ -22,50 +22,76 @@ def ensure_browser!
   args = ['node', cli, 'install', 'chromium']
 
   pid = Process.spawn(*args)
-  timeout_seconds = 300
+  max_wait = 600
+  interval = 5
+  waited = 0
 
-  begin
-    Timeout.timeout(timeout_seconds) { Process.wait(pid) }
-    success = $?.success?
-  rescue Timeout::Error
-    puts ""
-    puts "Install is taking longer than #{timeout_seconds / 60} minutes..."
-    begin
-      if Gem.win_platform?
-        system("taskkill /F /T /PID #{pid}")
-      else
-        Process.kill('TERM', pid)
-        Process.wait(pid)
+  loop do
+    sleep interval
+    waited += interval
+
+    done = Process.waitpid(pid, Process::WNOHANG)
+    if done
+      if Playwright.chromium_installed?
+        sleep 5
       end
-    rescue
+      if Playwright.chromium_installed?
+        puts ""
+        puts "Chromium is ready."
+        puts "  #{Playwright.chromium_browser_path}"
+        puts ""
+        return
+      else
+        puts ""
+        puts "Failed to install Chromium. Run manually: npx playwright-core install chromium"
+        exit 1
+      end
     end
 
     if Playwright.chromium_installed?
-      puts "Chromium binary was downloaded successfully despite the timeout."
+      puts ""
+      puts "Chromium binary is ready (download completed)."
       puts "  #{Playwright.chromium_browser_path}"
       puts ""
+      begin
+        if Gem.win_platform?
+          system("taskkill /F /T /PID #{pid}", exception: false)
+        else
+          Process.kill('TERM', pid)
+          Process.wait(pid)
+        end
+      rescue
+      end
       return
-    else
-      puts "Chromium install did not complete."
-      puts "Try manually:  npx playwright-core install chromium"
-      exit 1
     end
-  end
 
-  unless success
-    if Playwright.chromium_installed?
+    if waited >= max_wait
       puts ""
-      puts "Chromium is ready (install reported failure but binary exists)."
-      puts "  #{Playwright.chromium_browser_path}"
-      puts ""
-      return
+      puts "Install is taking longer than #{max_wait / 60} minutes..."
+      begin
+        if Gem.win_platform?
+          system("taskkill /F /T /PID #{pid}", exception: false)
+        else
+          Process.kill('TERM', pid)
+          Process.wait(pid)
+        end
+      rescue
+      end
+
+      if Playwright.chromium_installed?
+        puts "Chromium binary was downloaded successfully despite the timeout."
+        puts "  #{Playwright.chromium_browser_path}"
+        puts ""
+        return
+      else
+        puts "Chromium install did not complete."
+        puts "Try manually:  npx playwright-core install chromium"
+        exit 1
+      end
     end
-    puts ""
-    puts "Failed to install Chromium. Run manually: npx playwright-core install chromium"
-    exit 1
+
+    print "." if waited % 30 == 0
   end
-  puts ""
-  puts "Chromium is ready."
 end
 ensure_browser!
 

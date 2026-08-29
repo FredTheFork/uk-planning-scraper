@@ -48,58 +48,94 @@ def ensure_playwright_browser!
 
   args = ['node', cli, 'install', 'chromium']
 
-  # Run the install with a timeout. The Node process can hang after download
-  # completes (during extraction) due to antivirus scanning or file locks.
-  # If it times out, we check whether the binary actually landed on disk —
-  # if so, we proceed anyway.
+  # Use a polling loop instead of Timeout+Process.wait, which hangs on
+  # Windows when the Node process gets stuck during extraction.
+  # We check every 5 seconds whether the browser binary has appeared
+  # on disk, and give up after 10 minutes.
   pid = Process.spawn(*args)
-  timeout_seconds = 300  # 5 minutes
+  max_wait = 600  # 10 minutes total
+  interval = 5   # check every 5 seconds
+  waited = 0
 
-  begin
-    Timeout.timeout(timeout_seconds) { Process.wait(pid) }
-    success = $?.success?
-  rescue Timeout::Error
-    puts ""
-    puts "Install is taking longer than #{timeout_seconds / 60} minutes..."
-    begin
-      if Gem.win_platform?
-        system("taskkill /F /T /PID #{pid}")
+  loop do
+    sleep interval
+    waited += interval
+
+    # Check if the process finished on its own
+    done = Process.waitpid(pid, Process::WNOHANG)
+    if done
+      # Process exited — check if browser is there
+      if Playwright.chromium_installed?
+        puts ""
+        puts "Chromium is ready."
+        puts "  #{Playwright.chromium_browser_path}"
+        puts ""
+        return
       else
-        Process.kill('TERM', pid)
-        Process.wait(pid)
+        # Process finished but browser not found — maybe it's still extracting
+        sleep 5
+        if Playwright.chromium_installed?
+          puts ""
+          puts "Chromium is ready."
+          puts "  #{Playwright.chromium_browser_path}"
+          puts ""
+          return
+        end
+        puts ""
+        puts "Failed to install Chromium automatically."
+        puts "Try manually:  npx playwright-core install chromium"
+        exit 1
       end
-    rescue
     end
 
-    if Playwright.chromium_installed?
-      puts "Chromium binary was downloaded successfully despite the timeout."
-      puts "  #{Playwright.chromium_browser_path}"
-      puts ""
-      return
-    else
-      puts "Chromium install did not complete."
-      puts "Try manually:  npx playwright-core install chromium"
-      exit 1
-    end
-  end
-
-  unless success
+    # Process still running — check if browser appeared on disk anyway
     if Playwright.chromium_installed?
       puts ""
-      puts "Chromium is ready (install reported failure but binary exists)."
+      puts "Chromium binary is ready (download completed)."
       puts "  #{Playwright.chromium_browser_path}"
       puts ""
+      # Kill the lingering Node process
+      begin
+        if Gem.win_platform?
+          system("taskkill /F /T /PID #{pid}", exception: false)
+        else
+          Process.kill('TERM', pid)
+          Process.wait(pid)
+        end
+      rescue
+      end
       return
     end
-    puts ""
-    puts "Failed to install Chromium automatically."
-    puts "Try manually:  npx playwright-core install chromium"
-    exit 1
-  end
 
-  puts ""
-  puts "Chromium is ready."
-  puts ""
+    if waited >= max_wait
+      puts ""
+      puts "Install is taking longer than #{max_wait / 60} minutes..."
+      puts "Killing the install process and checking if the browser landed..."
+      begin
+        if Gem.win_platform?
+          system("taskkill /F /T /PID #{pid}", exception: false)
+        else
+          Process.kill('TERM', pid)
+          Process.wait(pid)
+        end
+      rescue
+      end
+
+      if Playwright.chromium_installed?
+        puts "Chromium binary was downloaded successfully despite the timeout."
+        puts "  #{Playwright.chromium_browser_path}"
+        puts ""
+        return
+      else
+        puts "Chromium install did not complete."
+        puts "Try manually:  npx playwright-core install chromium"
+        exit 1
+      end
+    end
+
+    # Print a dot every 30 seconds so the user knows it's alive
+    print "." if waited % 30 == 0
+  end
 end
 
 ensure_playwright_browser!
