@@ -43,7 +43,8 @@ module UKPlanningScraper
       elsif @url.match(/newapplicationssearch\.aspx/i) && !@url.match(/camden\.gov\.uk/i)
         @system = 'northgate'
 
-      elsif @url.match(%r{planningregister\.planningsystemni\.gov\.uk}i)
+      elsif @url.match?(%r{planningregister\.planningsystemni\.gov\.uk}i) ||
+            @url.match?(%r{planningsystemni\.gov\.uk}i)
         @system = 'systemni'
       elsif @url =~ /ocellaweb|great-yarmouth|hillingdon|havering|sholland|arun/
         @system = 'ocella'

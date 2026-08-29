@@ -123,6 +123,72 @@ module Playwright
     end
   end
 
+  # Scan ALL chromium-* directories for a real chrome binary.
+  # Returns the path to the first real binary found, or nil.
+  def self.find_any_chromium_binary
+    base = browsers_base_dir
+    return nil unless File.directory?(base)
+
+    # Prefer non-symlink directories first, then fallback to symlinks
+    Dir.glob(File.join(base, 'chromium-*')).sort do |a, b|
+      a_symlink = File.symlink?(a) ? 1 : 0
+      b_symlink = File.symlink?(b) ? 1 : 0
+      [a_symlink, File.basename(b)] <=> [b_symlink, File.basename(a)]
+    end.each do |dir|
+      if Gem.win_platform?
+        exe = File.join(dir, 'chrome-win', 'chrome.exe')
+        return exe if File.file?(exe)
+        exe = find_chrome_exe(dir)
+        return exe if exe
+      else
+        exe = File.join(dir, 'chrome-linux', 'chrome')
+        return exe if File.file?(exe)
+      end
+    end
+    nil
+  end
+
+  # Create symlinks for ALL missing chromium-* revision directories
+  # by pointing them to the directory that has the real binary.
+  def self.ensure_all_chromium_symlinks!
+    base = browsers_base_dir
+    return unless File.directory?(base)
+
+    real_dir = nil
+    Dir.glob(File.join(base, 'chromium-*')).each do |dir|
+      next if File.symlink?(dir)
+      has_binary = if Gem.win_platform?
+        File.file?(File.join(dir, 'chrome-win', 'chrome.exe')) || !!find_chrome_exe(dir)
+      else
+        File.file?(File.join(dir, 'chrome-linux', 'chrome'))
+      end
+      real_dir = dir if has_binary && real_dir.nil?
+    end
+
+    return unless real_dir
+
+    Dir.glob(File.join(base, 'chromium-*')).each do |dir|
+      next if File.symlink?(dir)
+      next if dir == real_dir
+
+      has_binary = if Gem.win_platform?
+        File.file?(File.join(dir, 'chrome-win', 'chrome.exe')) || !!find_chrome_exe(dir)
+      else
+        File.file?(File.join(dir, 'chrome-linux', 'chrome'))
+      end
+
+      unless has_binary
+        FileUtils.rm_rf(dir) if File.directory?(dir)
+        if Gem.win_platform?
+          system('cmd', '/c', 'mklink', '/J', dir, real_dir)
+        else
+          FileUtils.ln_s(real_dir, dir)
+        end
+        puts "  Linked #{dir} -> #{real_dir}"
+      end
+    end
+  end
+
   def self.find_chrome_exe(dir)
     return nil unless File.directory?(dir)
     Dir.glob(File.join(dir, '**', 'chrome{.exe,}')).first
@@ -414,9 +480,25 @@ module Playwright
     chromium_ok = chromium_installed?
     winldd_ok = Gem.win_platform? ? winldd_installed? : true
 
+    # Also check if ANY chromium binary exists (even under a different revision)
+    any_chrome = find_any_chromium_binary
+
     if chromium_ok && winldd_ok
       puts "Chromium is already installed at: #{chromium_browser_path}"
       return
+    end
+
+    # If the specific revision isn't found but another revision's binary
+    # exists, create symlinks for ALL missing revision directories
+    if !chromium_ok && any_chrome
+      puts "Chromium revision mismatch detected. Creating symlinks for all missing revisions..."
+      ensure_all_chromium_symlinks!
+      ensure_browser_symlinks!
+      chromium_ok = chromium_installed?
+      if chromium_ok
+        puts "Chromium linked to existing revision at: #{chromium_browser_path}"
+        return if winldd_ok
+      end
     end
 
     # Step 4: Try symlinking from existing browsers/tools under different
@@ -484,8 +566,37 @@ module Playwright
     end
   end
 
+  # Monkey-patch BrowserType#launch to always pass executablePath
+  # so Playwright never looks for a revision-specific directory that
+  # might not exist (the gem's expected revision can differ from
+  # the Node playwright-core's browsers.json revision).
+  def self.patch_browser_launch!
+    return if @browser_launch_patched
+    @browser_launch_patched = true
+
+    return unless defined?(::Playwright::BrowserType)
+
+    browser_type_class = ::Playwright::BrowserType
+    original_launch = browser_type_class.instance_method(:launch)
+
+    browser_type_class.define_method(:launch) do |**opts|
+      exe_path = ::Playwright.find_any_chromium_binary
+      if exe_path && File.file?(exe_path)
+        unless opts.key?(:executablePath) || opts.key?(:executable_path)
+          opts[:executablePath] = exe_path
+        end
+      end
+      original_launch.bind(self).call(**opts)
+    end
+
+    puts "Patched BrowserType#launch to use explicit executablePath" if ENV['PW_DEBUG']
+  end
+
   # Run the full browser setup at load time.
   ensure_browser!
+
+  # After browser setup, patch the launch method
+  patch_browser_launch!
 
   unless respond_to?(:create)
     raise <<~MSG

@@ -27,13 +27,25 @@ module UKPlanningScraper
     @@warned_hosts      = Set.new        # hosts we have displayed a warning for
     TLS_VERBOSE         = ENV['IDOX_TLS_VERBOSE'] == '1'
 
-    # helper ─ fetch with retry / host‑scoped VERIFY_NONE
+    # Circuit breaker state for 429 rate limiting
+    @@circuit_open_until = {}  # host -> Time when circuit resets
+    @@consecutive_429s   = {}  # host -> count of consecutive 429s
+    @@detail_delay       = (ENV['IDOX_DETAIL_DELAY'] || 2).to_f  # seconds between detail pages
+
+    # helper ─ fetch with retry / host‑scoped VERIFY_NONE / circuit breaker
     def fetch_page(url, secure_agent)
       host = URI(url).host
 
       # Short‑circuit if this host is known-broken
       if @@insecure_hosts.include?(host)
         return (@@insecure_agents[host] ||= build_insecure_agent(secure_agent)).get(url)
+      end
+
+      # Check circuit breaker
+      if @@circuit_open_until[host] && Time.now < @@circuit_open_until[host]
+        wait_remaining = (@@circuit_open_until[host] - Time.now).round
+        puts "Circuit breaker open for #{host} (#{wait_remaining}s remaining) – skipping #{url}"
+        return nil
       end
 
       # optimistic secure fetch
@@ -47,16 +59,19 @@ module UKPlanningScraper
       (@@insecure_agents[host] ||= build_insecure_agent(secure_agent)).get(url)
     rescue Mechanize::ResponseCodeError => e
       if e.response_code == '429'
-        retry_attempts = (Thread.current[:idox_429_retries] || 0) + 1
-        Thread.current[:idox_429_retries] = retry_attempts
-        if retry_attempts <= 3
-          wait = 5 * retry_attempts
-          puts "⚠️  Rate limited (429) on #{url} – retrying in #{wait}s (attempt #{retry_attempts}/3)"
+        @@consecutive_429s[host] = (@@consecutive_429s[host] || 0) + 1
+        count = @@consecutive_429s[host]
+
+        if count <= 3
+          wait = 5 * count
+          puts "⚠️  Rate limited (429) on #{url} – retrying in #{wait}s (attempt #{count}/3)"
           sleep wait
           retry
         else
-          Thread.current[:idox_429_retries] = 0
-          warn "⚠️  Rate limited (429) after 3 retries – skipping #{url}"
+          # Open the circuit breaker for 60 seconds
+          @@circuit_open_until[host] = Time.now + 60
+          @@consecutive_429s[host] = 0
+          warn "⚠️  Rate limited (429) after 3 retries – opening circuit breaker for 60s – skipping #{url}"
           return nil
         end
       end
@@ -188,12 +203,30 @@ module UKPlanningScraper
           end
 
           # === Individual application pages ===
+          enriched_count = 0
+          skipped_count = 0
+          host = URI(@url).host
+
           apps.each_with_index do |app, idx|
             puts "#{idx + 1} of #{apps.size}: #{app.info_url}"
-            sleep 1 if idx > 0
+
+            # Check circuit breaker before each request
+            if @@circuit_open_until[host] && Time.now < @@circuit_open_until[host]
+              wait_remaining = (@@circuit_open_until[host] - Time.now).round
+              puts "Circuit breaker still open for #{host} (#{wait_remaining}s remaining) – switching to collect-only mode"
+              skipped_count = apps.size - enriched_count
+              break
+            end
+
+            # Adaptive delay between detail pages
+            sleep @@detail_delay if idx > 0
 
             res = fetch_page(app.info_url, agent)
             next unless res && res.code == '200'
+
+            # Reset consecutive 429 counter on success
+            @@consecutive_429s[host] = 0
+            enriched_count += 1
 
             app.documents_count = 0
             if (dl = res.at('.associateddocument a') || res.at('#tab_documents')) && dl.text =~ /(\d+)/
@@ -229,6 +262,10 @@ module UKPlanningScraper
                 puts "⚠️ Error while fetching fallback reference: #{e.class} - #{e.message}"
               end
             end
+          end
+
+          if skipped_count > 0
+            puts "Idox enrichment summary for #{@name}: #{enriched_count} enriched, #{skipped_count} skipped (basic data only)"
           end
         end
       rescue Timeout::Error
