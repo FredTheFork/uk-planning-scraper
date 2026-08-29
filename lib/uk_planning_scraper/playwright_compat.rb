@@ -307,7 +307,7 @@ module Playwright
     if const_defined?(:CLI_EXECUTABLE_PATH, false)
       remove_const(:CLI_EXECUTABLE_PATH)
     end
-    CLI_EXECUTABLE_PATH = cli_wrapper_path
+    const_set(:CLI_EXECUTABLE_PATH, cli_wrapper_path)
 
     # Step 3: If the browser already exists at the right revision, we're done.
     if chromium_installed?
