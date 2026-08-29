@@ -111,7 +111,11 @@ module UKPlanningScraper
               first_apps = parse_results_from_html(page.content)
               apps.concat(first_apps)
               puts "  → Page 1: #{first_apps.size} applications"
-              sleep 30
+              if first_apps.empty?
+                puts "⚠️  No results parsed from search response for #{@authority.name}."
+                puts "    Response length: #{response_html&.length || 0} chars"
+                File.write("debug_northgate_#{@authority.name.gsub(/\s+/, '_')}.html", response_html || '') rescue nil
+              end
               # pagination loop
               page_index = 1
               loop do
@@ -258,7 +262,11 @@ module UKPlanningScraper
 
     def parse_results_from_html(html)
       doc = Nokogiri::HTML(html)
-      table = doc.at('table.display_table')
+      table = doc.at('table.display_table') ||
+              doc.at('table.searchresults') ||
+              doc.at('table.results') ||
+              doc.at("table[class*='display']") ||
+              doc.at("table[class*='result']")
       return [] unless table
       rows = table.css('tr')[1..] || []
       rows.each_with_object([]) do |row, apps|
@@ -271,16 +279,6 @@ module UKPlanningScraper
         app.description = cells[2].text.strip
         app.status = cells[3].text.strip
         app.date_received = Date.parse(cells[4].text.strip)
-##############################################################################
-        # Print debugging info
-        puts "------------------------------------------------------------"
-        puts "  Ref:        #{app.council_reference}"
-        puts "  Address:    #{app.address}"
-        puts "  Description:#{app.description}"
-        puts "  Date:       #{app.date_received}"
-        puts "  Link:       #{app.info_url}"
-        puts "------------------------------------------------------------"
-##############################################################################
         apps << app
       end
     end

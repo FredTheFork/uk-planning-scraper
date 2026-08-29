@@ -540,7 +540,6 @@ module UKPlanningScraper
 
                     # 📅 Arcus: Fill missing received/valid date (ultra-robust version)
                     if app.date_received.nil?
-                      puts 'peper'
                       begin
                         # Try main Arcus structure (semantic match)
                         date_field = detail_page.query_selector('div.pr-summary-list__row:has(dt:has-text("Valid date")) dd.pr-summary-list__value')
@@ -638,17 +637,6 @@ module UKPlanningScraper
 
                     if app.valid?
                       seen_references << ref_text
-                      puts "✅ Valid app: #{app.to_hash}"
-              ##############################################################################
-                        # Print debugging info
-                        puts "------------------------------------------------------------"
-                        puts "  Ref:        #{app.council_reference}"
-                        puts "  Address:    #{app.address}"
-                        puts "  Description:#{app.description}"
-                        puts "  Date:       #{app.date_received}"
-                        puts "  Link:       #{app.info_url}"
-                        puts "------------------------------------------------------------"
-              ##############################################################################                  
                       apps << app
                       puts "  → Added application #{app.council_reference}"
                     else

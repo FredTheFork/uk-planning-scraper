@@ -43,6 +43,8 @@ module UKPlanningScraper
       elsif @url.match(/newapplicationssearch\.aspx/i) && !@url.match(/camden\.gov\.uk/i)
         @system = 'northgate'
 
+      elsif @url.match(%r{planningregister\.planningsystemni\.gov\.uk}i)
+        @system = 'systemni'
       elsif @url =~ /ocellaweb|great-yarmouth|hillingdon|havering|sholland|arun/
         @system = 'ocella'
       elsif @url.match(%r{/planning/index\.html\?(?:.*&)?fa=search}i)
@@ -54,8 +56,6 @@ module UKPlanningScraper
         @system = 'agileapps'
       elsif @url.match(%r{planning\.redbridge\.gov\.uk/redbridge/search-applications/?$}i)
         @system = 'agileapps'
-      elsif @url.match(%r{planningregister\.planningsystemni\.gov\.uk}i)
-        @system = 'systemni'
       # Arcus family of systems — include various known URL shapes but exclude the specific Wiltshire tabset URL
       elsif @url =~ %r{
               (?:                                     # any of the following (case-insensitive)

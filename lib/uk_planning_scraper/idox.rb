@@ -46,6 +46,20 @@ module UKPlanningScraper
       @@insecure_hosts << host
       (@@insecure_agents[host] ||= build_insecure_agent(secure_agent)).get(url)
     rescue Mechanize::ResponseCodeError => e
+      if e.response_code == '429'
+        retry_attempts = (Thread.current[:idox_429_retries] || 0) + 1
+        Thread.current[:idox_429_retries] = retry_attempts
+        if retry_attempts <= 3
+          wait = 5 * retry_attempts
+          puts "⚠️  Rate limited (429) on #{url} – retrying in #{wait}s (attempt #{retry_attempts}/3)"
+          sleep wait
+          retry
+        else
+          Thread.current[:idox_429_retries] = 0
+          warn "⚠️  Rate limited (429) after 3 retries – skipping #{url}"
+          return nil
+        end
+      end
       warn "HTTP error: #{e.response_code} – skipping #{url}"
       return nil
     rescue SocketError, StandardError => e
@@ -176,13 +190,7 @@ module UKPlanningScraper
           # === Individual application pages ===
           apps.each_with_index do |app, idx|
             puts "#{idx + 1} of #{apps.size}: #{app.info_url}"
-            puts "------------------------------------------------------------"
-            puts "  Ref:        #{app.council_reference}"
-            puts "  Address:    #{app.address}"
-            puts "  Description:#{app.description}"
-            puts "  Date:       #{app.date_received}"
-            puts "  Link:       #{app.info_url}"
-            puts "------------------------------------------------------------"
+            sleep 1 if idx > 0
 
             res = fetch_page(app.info_url, agent)
             next unless res && res.code == '200'
@@ -221,7 +229,6 @@ module UKPlanningScraper
                 puts "⚠️ Error while fetching fallback reference: #{e.class} - #{e.message}"
               end
             end
-            puts "  Description:#{app.description}"
           end
         end
       rescue Timeout::Error

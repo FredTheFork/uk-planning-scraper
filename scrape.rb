@@ -36,7 +36,7 @@ require_relative 'lib/uk_planning_scraper/systemni'
 require 'csv'
 require 'time'
 
-DAYS = 7
+DAYS = 7 unless defined?(DAYS)
 AUTHORITIES_CSV = File.join(__dir__, 'lib/uk_planning_scraper/authorities.csv')
 RETRY_CSV = File.join(__dir__, 'retry_authorities.csv')
 
