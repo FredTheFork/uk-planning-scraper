@@ -154,27 +154,48 @@ module Playwright
     puts "  URL: #{download_url}"
     puts "  Dest: #{dest_dir}"
 
-    uri = URI(download_url)
-    http = Net::HTTP.new(uri.host, uri.port)
-    http.use_ssl = uri.scheme == 'https'
-    http.read_timeout = 600
-
-    request = Net::HTTP::Get.new(uri)
-    request['User-Agent'] = 'Mozilla/5.0'
-
+    # Follow redirects (the CDN returns 307) and stream the body to disk.
+    # Net::HTTP does NOT follow 307/301/302 automatically.
+    current_url = download_url
+    max_redirects = 10
     total_bytes = 0
     downloaded_bytes = 0
     last_print = 0
+    done = false
 
-    http.request(request) do |response|
-      if response.code.to_i != 200
-        raise "Download failed: HTTP #{response.code}"
-      end
+    File.open(zip_path, 'wb') do |f|
+      until done
+        uri = URI(current_url)
+        http = Net::HTTP.new(uri.host, uri.port)
+        http.use_ssl = uri.scheme == 'https'
+        http.read_timeout = 600
 
-      total_bytes = response['Content-Length'] ? response['Content-Length'].to_i : 0
-      puts "  Size: #{(total_bytes / 1048576.0).round(1)} MB" if total_bytes > 0
+        request = Net::HTTP::Get.new(uri)
+        request['User-Agent'] = 'Mozilla/5.0'
 
-      File.open(zip_path, 'wb') do |f|
+        response = http.request(request)
+
+        code = response.code.to_i
+
+        if [301, 302, 303, 307, 308].include?(code)
+          location = response['Location']
+          if location.nil? || location.strip.empty?
+            raise "Download failed: redirect (HTTP #{code}) without Location header"
+          end
+          current_url = location.start_with?('http') ? location : URI.join(current_url, location).to_s
+          puts "  Redirected to: #{current_url}"
+          max_redirects -= 1
+          raise "Download failed: too many redirects" if max_redirects <= 0
+          next
+        end
+
+        if code != 200
+          raise "Download failed: HTTP #{code}"
+        end
+
+        total_bytes = response['Content-Length'] ? response['Content-Length'].to_i : 0
+        puts "  Size: #{(total_bytes / 1048576.0).round(1)} MB" if total_bytes > 0
+
         response.read_body do |chunk|
           f.write(chunk)
           downloaded_bytes += chunk.size
@@ -184,11 +205,13 @@ module Playwright
               pct = (downloaded_bytes * 100 / total_bytes)
               print "\r  Downloaded: #{pct}% (#{(downloaded_bytes / 1048576.0).round(1)} MB)"
             else
-              print "\r  Downloaded: #{(downloaded_bytes / 1048576.0).round(1)} MB"
+              print "\r  Downloaded: #{(downloaded_bytes / 1048576.0).round(1)} MB)"
             end
             last_print = now
           end
         end
+
+        done = true
       end
     end
 
