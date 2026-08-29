@@ -3,9 +3,10 @@
 # Compatibility layer for playwright-ruby-client.
 #
 # Ensures the Node playwright-core package version matches the Ruby gem,
-# and that the correct Chromium browser binary is downloaded and available.
-# This file runs at require time so every script that loads it gets a
-# working browser automatically.
+# and that the correct Chromium browser binary AND all required helper
+# tools (winldd on Windows, chromium-headless-shell) are downloaded
+# and available.  This file runs at require time so every script that
+# loads it gets a working browser automatically.
 
 require 'concurrent'
 require 'base64'
@@ -79,13 +80,31 @@ module Playwright
     end
   end
 
-  # Read the Chromium revision from the installed playwright-core's browsers.json.
+  # Read the browsers.json file from the installed playwright-core.
+  def self.browsers_json
+    path = File.join(NODE_MODULES, 'playwright-core', 'browsers.json')
+    return nil unless File.file?(path)
+    JSON.parse(File.read(path))
+  end
+
+  # Read a specific browser/tool revision from browsers.json.
+  def self.browser_revision(name)
+    data = browsers_json
+    return nil unless data
+    entry = data['browsers']&.find { |b| b['name'] == name }
+    entry ? entry['revision'] : nil
+  end
+
   def self.chromium_revision
-    browsers_json = File.join(NODE_MODULES, 'playwright-core', 'browsers.json')
-    return nil unless File.file?(browsers_json)
-    data = JSON.parse(File.read(browsers_json))
-    chromium_entry = data['browsers']&.find { |b| b['name'] == 'chromium' }
-    chromium_entry ? chromium_entry['revision'] : nil
+    browser_revision('chromium')
+  end
+
+  def self.chromium_headless_shell_revision
+    browser_revision('chromium-headless-shell')
+  end
+
+  def self.winldd_revision
+    browser_revision('winldd')
   end
 
   # Path to the Chromium browser binary.
@@ -114,80 +133,140 @@ module Playwright
     !path.nil? && File.file?(path)
   end
 
-  def self.chromium_download_info
-    revision = chromium_revision
+  # Path to the chromium-headless-shell binary (used by newer Playwright versions).
+  def self.chromium_headless_shell_path
+    revision = chromium_headless_shell_revision
     return nil unless revision
 
-    browsers_json = File.join(NODE_MODULES, 'playwright-core', 'browsers.json')
-    data = JSON.parse(File.read(browsers_json))
-    chromium_entry = data['browsers']&.find { |b| b['name'] == 'chromium' }
+    dir = File.join(browsers_base_dir, "chromium_headless_shell-#{revision}")
 
     if Gem.win_platform?
-      {
-        revision: revision,
-        download_url: chromium_entry['downloadURL'] || "https://cdn.playwright.dev/dbazure/download/playwright/builds/chromium/#{revision}/chromium-win64.zip",
-        dest_dir: File.join(browsers_base_dir, "chromium-#{revision}"),
-        marker_file: File.join(browsers_base_dir, "chromium-#{revision}", 'INSTALLATION_COMPLETE')
-      }
+      File.join(dir, 'chrome-win', 'headless_shell.exe')
     else
-      {
-        revision: revision,
-        download_url: chromium_entry['downloadURL'] || "https://cdn.playwright.dev/dbazure/download/playwright/builds/chromium/#{revision}/chromium-linux.zip",
-        dest_dir: File.join(browsers_base_dir, "chromium-#{revision}"),
-        marker_file: File.join(browsers_base_dir, "chromium-#{revision}", 'INSTALLATION_COMPLETE')
-      }
+      File.join(dir, 'chrome-linux', 'headless_shell')
     end
   end
 
-  # Download and extract Chromium entirely in Ruby, bypassing the Node CLI
-  # which hangs during zip extraction on some Windows systems.
-  def self.install_chromium_ruby!
-    info = chromium_download_info
-    raise "Could not read Chromium download info from browsers.json" unless info
+  def self.chromium_headless_shell_installed?
+    path = chromium_headless_shell_path
+    !path.nil? && File.file?(path)
+  end
+
+  # Path to the winldd PrintDeps.exe binary (Windows-only dependency tool).
+  def self.winldd_path
+    revision = winldd_revision
+    return nil unless revision
+    File.join(browsers_base_dir, "winldd-#{revision}", 'PrintDeps.exe')
+  end
+
+  def self.winldd_installed?
+    return false unless Gem.win_platform?
+    path = winldd_path
+    !path.nil? && File.file?(path)
+  end
+
+  # Build the download info hash for any browser/tool entry from browsers.json.
+  def self.download_info_for(name)
+    data = browsers_json
+    return nil unless data
+    entry = data['browsers']&.find { |b| b['name'] == name }
+    return nil unless entry
+
+    revision = entry['revision']
+    base_url = entry['downloadURL'] || "https://cdn.playwright.dev/dbazure/download/playwright/builds"
+
+    # Determine the platform-specific download URL and archive name.
+    if Gem.win_platform?
+      url = "#{base_url}/#{name}/#{revision}/#{name}-win64.zip"
+    else
+      url = "#{base_url}/#{name}/#{revision}/#{name}-linux.zip"
+    end
+
+    # The directory name convention differs per tool.
+    dir_name = case name
+               when 'chromium' then "chromium-#{revision}"
+               when 'chromium-headless-shell' then "chromium_headless_shell-#{revision}"
+               when 'winldd' then "winldd-#{revision}"
+               else "#{name}-#{revision}"
+               end
+
+    {
+      name: name,
+      revision: revision,
+      download_url: url,
+      dest_dir: File.join(browsers_base_dir, dir_name),
+      marker_file: File.join(browsers_base_dir, dir_name, 'INSTALLATION_COMPLETE')
+    }
+  end
+
+  def self.chromium_download_info
+    download_info_for('chromium')
+  end
+
+  # Generic download-and-extract for any browser/tool entry.
+  def self.install_tool_ruby!(name)
+    info = download_info_for(name)
+    raise "Could not read download info for #{name} from browsers.json" unless info
 
     dest_dir = info[:dest_dir]
     marker = info[:marker_file]
     download_url = info[:download_url]
 
-    return true if chromium_installed?
+    # Check if already installed (by binary presence, not just marker).
+    installed_check = case name
+                      when 'chromium' then chromium_installed?
+                      when 'chromium-headless-shell' then chromium_headless_shell_installed?
+                      when 'winldd' then winldd_installed?
+                      else File.file?(marker)
+                      end
+    return true if installed_check
 
     if File.directory?(dest_dir)
       FileUtils.rm_rf(dest_dir)
     end
     FileUtils.mkdir_p(dest_dir)
 
-    zip_path = File.join(dest_dir, 'chromium.zip')
+    zip_path = File.join(dest_dir, "#{name}.zip")
 
-    puts "Downloading Chromium (revision #{info[:revision]})..."
+    puts "Downloading #{name} (revision #{info[:revision]})..."
     puts "  URL: #{download_url}"
     puts "  Dest: #{dest_dir}"
 
     total = 0
     last_print = [0]
 
-    URI.open(download_url, 'rb',
-      'User-Agent' => 'Mozilla/5.0',
-      read_timeout: 600,
-      content_length_proc: ->(len) { total = len.to_i },
-      progress_proc: ->(size) {
-        now = Time.now.to_i
-        if now - last_print[0] >= 3
-          if total > 0
-            pct = (size * 100 / total)
-            print "\r  Downloaded: #{pct}% (#{(size / 1048576.0).round(1)} MB)"
-          else
-            print "\r  Downloaded: #{(size / 1048576.0).round(1)} MB"
+    begin
+      URI.open(download_url, 'rb',
+        'User-Agent' => 'Mozilla/5.0',
+        read_timeout: 600,
+        content_length_proc: ->(len) { total = len.to_i },
+        progress_proc: ->(size) {
+          now = Time.now.to_i
+          if now - last_print[0] >= 3
+            if total > 0
+              pct = (size * 100 / total)
+              print "\r  Downloaded: #{pct}% (#{(size / 1048576.0).round(1)} MB)"
+            else
+              print "\r  Downloaded: #{(size / 1048576.0).round(1)} MB"
+            end
+            last_print[0] = now
           end
-          last_print[0] = now
-        end
-      }
-    ) do |response|
-      puts "  Size: #{(total / 1048576.0).round(1)} MB" if total > 0
-      File.open(zip_path, 'wb') do |f|
-        while (chunk = response.read(65536))
-          f.write(chunk)
+        }
+      ) do |response|
+        puts "  Size: #{(total / 1048576.0).round(1)} MB" if total > 0
+        File.open(zip_path, 'wb') do |f|
+          while (chunk = response.read(65536))
+            f.write(chunk)
+          end
         end
       end
+    rescue OpenURI::HTTPError => e
+      # Some tools (e.g. winldd on non-Windows, or chromium-headless-shell
+      # on older revisions) may not have a download available for this
+      # platform.  That's OK — skip gracefully.
+      puts "  ⚠️  No download available for #{name} on this platform (#{e.message}). Skipping."
+      FileUtils.rm_rf(dest_dir) if File.directory?(dest_dir)
+      return false
     end
 
     puts ""
@@ -206,8 +285,12 @@ module Playwright
     File.write(marker, Time.now.to_s)
 
     puts "  Extraction complete."
-    puts "  Chromium installed at: #{chromium_browser_path}"
     true
+  end
+
+  # Backwards-compatible alias.
+  def self.install_chromium_ruby!
+    install_tool_ruby!('chromium')
   end
 
   def self.installed_core_version
@@ -255,50 +338,69 @@ module Playwright
     base = browsers_base_dir
     return unless File.directory?(base)
 
-    actual_revision = chromium_revision
-    return unless actual_revision
+    link_revision = lambda do |name, expected_revision|
+      next unless expected_revision
 
-    actual_dir = File.join(base, "chromium-#{actual_revision}")
-    actual_binary = if Gem.win_platform?
-      File.join(actual_dir, 'chrome-win', 'chrome.exe')
-    else
-      File.join(actual_dir, 'chrome-linux', 'chrome')
+      expected_dir = File.join(base, "#{name == 'chromium-headless-shell' ? 'chromium_headless_shell' : name}-#{expected_revision}")
+
+      # Check if the binary already exists at the expected revision.
+      binary_check = case name
+                     when 'chromium'
+                       path = File.join(expected_dir, 'chrome-win', 'chrome.exe')
+                       path = find_chrome_exe(expected_dir) unless Gem.win_platform? && File.file?(path)
+                       path && File.file?(path)
+                     when 'winldd'
+                       File.file?(File.join(expected_dir, 'PrintDeps.exe'))
+                     else
+                       File.directory?(expected_dir)
+                     end
+      next if binary_check
+
+      # Scan for any folder matching this tool that has the real binary.
+      pattern = case name
+                when 'chromium' then 'chromium-*'
+                when 'chromium-headless-shell' then 'chromium_headless_shell-*'
+                when 'winldd' then 'winldd-*'
+                else "#{name}-*"
+                end
+
+      Dir.glob(File.join(base, pattern)).each do |existing_dir|
+        next if existing_dir == expected_dir
+
+        has_binary = case name
+                     when 'chromium'
+                       f = File.join(existing_dir, 'chrome-win', 'chrome.exe')
+                       f = find_chrome_exe(existing_dir) unless Gem.win_platform? && File.file?(f)
+                       f && File.file?(f)
+                     when 'winldd'
+                       File.file?(File.join(existing_dir, 'PrintDeps.exe'))
+                     else
+                       File.directory?(existing_dir)
+                     end
+        next unless has_binary
+
+        if File.directory?(expected_dir) || File.symlink?(expected_dir)
+          FileUtils.rm_rf(expected_dir)
+        end
+
+        if Gem.win_platform?
+          system('cmd', '/c', 'mklink', '/J', expected_dir, existing_dir)
+        else
+          FileUtils.ln_s(existing_dir, expected_dir)
+        end
+
+        puts "  Linked #{expected_dir} -> #{existing_dir}"
+        break
+      end
     end
-    actual_binary = find_chrome_exe(actual_dir) unless actual_binary && File.file?(actual_binary)
 
-    # If the browser binary exists at the expected revision, we're done.
-    return if actual_binary && File.file?(actual_binary)
-
-    # Scan for any chromium-* folder that contains a real binary,
-    # and create a junction/symlink from the expected revision to it.
-    Dir.glob(File.join(base, 'chromium-*')).each do |existing_dir|
-      next if existing_dir == actual_dir
-
-      binary = if Gem.win_platform?
-        File.join(existing_dir, 'chrome-win', 'chrome.exe')
-      else
-        File.join(existing_dir, 'chrome-linux', 'chrome')
-      end
-      binary = find_chrome_exe(existing_dir) unless File.file?(binary)
-      next unless binary && File.file?(binary)
-
-      if File.directory?(actual_dir) || File.symlink?(actual_dir)
-        FileUtils.rm_rf(actual_dir)
-      end
-
-      if Gem.win_platform?
-        system('cmd', '/c', 'mklink', '/J', actual_dir, existing_dir)
-      else
-        FileUtils.ln_s(existing_dir, actual_dir)
-      end
-
-      puts "  Linked #{actual_dir} -> #{existing_dir}"
-      break
-    end
+    link_revision.call('chromium', chromium_revision)
+    link_revision.call('chromium-headless-shell', chromium_headless_shell_revision)
+    link_revision.call('winldd', winldd_revision) if Gem.win_platform?
   end
 
-  # Full browser setup: align node package, download browser if missing,
-  # create symlinks for revision mismatches. Called at load time.
+  # Full browser setup: align node package, download browser + tools if
+  # missing, create symlinks for revision mismatches. Called at load time.
   def self.ensure_browser!
     # Step 1: Align the Node playwright-core package to the gem version.
     ensure_matching_playwright_core!
@@ -309,35 +411,82 @@ module Playwright
     end
     const_set(:CLI_EXECUTABLE_PATH, cli_wrapper_path)
 
-    # Step 3: If the browser already exists at the right revision, we're done.
-    if chromium_installed?
+    # Step 3: Check what's missing. We must NOT return early just because
+    # Chromium exists — winldd or chromium-headless-shell may still be
+    # missing, which causes "Executable doesn't exist" errors at runtime.
+    chromium_ok = chromium_installed?
+    headless_shell_ok = chromium_headless_shell_installed?
+    winldd_ok = Gem.win_platform? ? winldd_installed? : true
+
+    if chromium_ok && headless_shell_ok && winldd_ok
       puts "Chromium is already installed at: #{chromium_browser_path}"
       return
     end
 
-    # Step 4: Try symlinking from an existing browser under a different revision.
+    # Step 4: Try symlinking from existing browsers/tools under different
+    # revisions before downloading anything.
     ensure_browser_symlinks!
-    return if chromium_installed?
 
-    # Step 5: No browser exists anywhere — download it.
-    puts "Chromium browser not found. Downloading now..."
-    begin
-      install_chromium_ruby!
-      ensure_browser_symlinks!
-    rescue => e
-      # Ruby download failed — try the Node CLI as fallback.
-      puts "Ruby-based download failed: #{e.class} - #{e.message}"
-      puts "Trying Node CLI to install chromium..."
-      cli = core_cli_path
-      if File.file?(cli)
-        system('node', cli, 'install', 'chromium')
-        ensure_browser_symlinks!
+    chromium_ok = chromium_installed?
+    headless_shell_ok = chromium_headless_shell_installed?
+    winldd_ok = Gem.win_platform? ? winldd_installed? : true
+
+    if chromium_ok && headless_shell_ok && winldd_ok
+      puts "Chromium linked to existing revision at: #{chromium_browser_path}"
+      return
+    end
+
+    # Step 5: Download whatever is still missing.
+    unless chromium_ok
+      puts "Chromium browser not found. Downloading now..."
+      begin
+        install_tool_ruby!('chromium')
+      rescue => e
+        puts "Ruby-based Chromium download failed: #{e.class} - #{e.message}"
+        puts "Trying Node CLI to install chromium..."
+        cli = core_cli_path
+        system('node', cli, 'install', 'chromium') if File.file?(cli)
       end
     end
 
-    unless chromium_installed?
-      warn "WARNING: Chromium browser could not be installed automatically."
-      warn "Run manually: node node_modules/playwright-core/cli.js install chromium"
+    unless headless_shell_ok
+      puts "chromium-headless-shell not found. Downloading now..."
+      begin
+        install_tool_ruby!('chromium-headless-shell')
+      rescue => e
+        puts "chromium-headless-shell download failed: #{e.class} - #{e.message}"
+        puts "Trying Node CLI..."
+        cli = core_cli_path
+        system('node', cli, 'install', 'chromium-headless-shell') if File.file?(cli)
+      end
+    end
+
+    if Gem.win_platform? && !winldd_ok
+      puts "winldd (PrintDeps.exe) not found. Downloading now..."
+      begin
+        install_tool_ruby!('winldd')
+      rescue => e
+        puts "winldd download failed: #{e.class} - #{e.message}"
+        puts "Trying Node CLI..."
+        cli = core_cli_path
+        system('node', cli, 'install', 'winldd') if File.file?(cli)
+      end
+    end
+
+    # Re-run symlinks in case downloads created new revision folders.
+    ensure_browser_symlinks!
+
+    # Final verification.
+    missing = []
+    missing << 'chromium' unless chromium_installed?
+    missing << 'chromium-headless-shell' unless chromium_headless_shell_installed?
+    missing << 'winldd' if Gem.win_platform? && !winldd_installed?
+
+    if missing.any?
+      warn "WARNING: The following Playwright components could not be installed: #{missing.join(', ')}"
+      warn "Run manually: node node_modules/playwright-core/cli.js install"
+    else
+      puts "All Playwright components are ready."
     end
   end
 
