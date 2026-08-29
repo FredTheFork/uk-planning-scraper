@@ -21,6 +21,9 @@ require 'mime/types'
 require 'open3'
 require 'fileutils'
 require 'json'
+require 'net/http'
+require 'uri'
+require 'zip'
 
 # Try vendored gems first, then fall back to system gem.
 vendor_lib = File.expand_path('../../../vendor', __dir__)
@@ -96,6 +99,121 @@ module Playwright
   def self.chromium_installed?
     path = chromium_browser_path
     !path.nil? && File.file?(path)
+  end
+
+  # Read the Chromium download URL and revision from browsers.json
+  def self.chromium_download_info
+    browsers_json = File.join(NODE_MODULES, 'playwright-core', 'browsers.json')
+    return nil unless File.file?(browsers_json)
+    data = JSON.parse(File.read(browsers_json))
+    chromium_entry = data['browsers']&.find { |b| b['name'] == 'chromium' }
+    return nil unless chromium_entry
+    revision = chromium_entry['revision']
+
+    if Gem.win_platform?
+      base = ENV['PLAYWRIGHT_BROWSERS_PATH'] || File.join(ENV['USERPROFILE'] || Dir.home, 'AppData', 'Local', 'ms-playwright')
+      {
+        revision: revision,
+        download_url: chromium_entry['downloadURL'] || "https://cdn.playwright.dev/dbazure/download/playwright/builds/chromium/#{revision}/chromium-win64.zip",
+        dest_dir: File.join(base, "chromium-#{revision}"),
+        marker_file: File.join(base, "chromium-#{revision}", 'INSTALLATION_COMPLETE')
+      }
+    else
+      base = ENV['PLAYWRIGHT_BROWSERS_PATH'] || File.join(Dir.home, '.cache', 'ms-playwright')
+      {
+        revision: revision,
+        download_url: chromium_entry['downloadURL'] || "https://cdn.playwright.dev/dbazure/download/playwright/builds/chromium/#{revision}/chromium-linux.zip",
+        dest_dir: File.join(base, "chromium-#{revision}"),
+        marker_file: File.join(base, "chromium-#{revision}", 'INSTALLATION_COMPLETE')
+      }
+    end
+  end
+
+  # Download and extract Chromium entirely in Ruby, bypassing the Node CLI
+  # which hangs during zip extraction on some Windows systems.
+  def self.install_chromium_ruby!
+    info = chromium_download_info
+    raise "Could not read Chromium download info from browsers.json" unless info
+
+    dest_dir = info[:dest_dir]
+    marker = info[:marker_file]
+    download_url = info[:download_url]
+
+    # Already installed?
+    return true if chromium_installed?
+
+    # Clean up any partial extraction
+    if File.directory?(dest_dir)
+      FileUtils.rm_rf(dest_dir)
+    end
+    FileUtils.mkdir_p(dest_dir)
+
+    zip_path = File.join(dest_dir, 'chromium.zip')
+
+    puts "Downloading Chromium (revision #{info[:revision]})..."
+    puts "  URL: #{download_url}"
+    puts "  Dest: #{dest_dir}"
+
+    uri = URI(download_url)
+    http = Net::HTTP.new(uri.host, uri.port)
+    http.use_ssl = uri.scheme == 'https'
+    http.read_timeout = 600
+
+    request = Net::HTTP::Get.new(uri)
+    request['User-Agent'] = 'Mozilla/5.0'
+
+    total_bytes = 0
+    downloaded_bytes = 0
+    last_print = 0
+
+    http.request(request) do |response|
+      if response.code.to_i != 200
+        raise "Download failed: HTTP #{response.code}"
+      end
+
+      total_bytes = response['Content-Length'] ? response['Content-Length'].to_i : 0
+      puts "  Size: #{(total_bytes / 1048576.0).round(1)} MB" if total_bytes > 0
+
+      File.open(zip_path, 'wb') do |f|
+        response.read_body do |chunk|
+          f.write(chunk)
+          downloaded_bytes += chunk.size
+          now = Time.now.to_i
+          if now - last_print >= 3
+            if total_bytes > 0
+              pct = (downloaded_bytes * 100 / total_bytes)
+              print "\r  Downloaded: #{pct}% (#{(downloaded_bytes / 1048576.0).round(1)} MB)"
+            else
+              print "\r  Downloaded: #{(downloaded_bytes / 1048576.0).round(1)} MB"
+            end
+            last_print = now
+          end
+        end
+      end
+    end
+
+    puts ""
+    puts "  Download complete. Extracting..."
+
+    # Extract the zip using rubyzip
+    Zip.on_exists_proc = true
+    Zip::File.open(zip_path) do |zip_file|
+      zip_file.each do |entry|
+        entry_path = File.join(dest_dir, entry.name)
+        FileUtils.mkdir_p(File.dirname(entry_path))
+        entry.extract(entry_path)
+      end
+    end
+
+    # Clean up the zip
+    File.delete(zip_path)
+
+    # Write the marker file Playwright expects
+    File.write(marker, Time.now.to_s)
+
+    puts "  Extraction complete."
+    puts "  Chromium installed at: #{chromium_browser_path}"
+    true
   end
 
   # Read the version of the currently installed playwright-core package.

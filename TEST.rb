@@ -19,6 +19,23 @@ def ensure_browser!
   puts "(This downloads ~150MB on first run — please be patient)"
   puts ""
 
+  # First, try the Ruby-based download + extraction (bypasses the Node CLI
+  # which hangs during zip extraction on some Windows systems).
+  begin
+    Playwright.install_chromium_ruby!
+    if Playwright.chromium_installed?
+      puts ""
+      puts "Chromium is ready (installed via Ruby)."
+      puts "  #{Playwright.chromium_browser_path}"
+      puts ""
+      return
+    end
+  rescue => e
+    puts "Ruby-based install failed: #{e.class} - #{e.message}"
+    puts "Falling back to Node CLI..."
+  end
+
+  # Fallback: use the Node CLI with a polling loop
   args = ['node', cli, 'install', 'chromium']
 
   pid = Process.spawn(*args)
