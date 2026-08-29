@@ -46,7 +46,7 @@ module UKPlanningScraper
       elsif @url.match?(%r{planningregister\.planningsystemni\.gov\.uk}i) ||
             @url.match?(%r{planningsystemni\.gov\.uk}i)
         @system = 'systemni'
-      elsif @url =~ /ocellaweb|great-yarmouth|hillingdon|havering|sholland|arun/
+      elsif @url =~ /ocellaweb|great-yarmouth|hillingdon|havering|sholland|\barun\b/
         @system = 'ocella'
       elsif @url.match(%r{/planning/index\.html\?(?:.*&)?fa=search}i)
         @system = 'agileplanning'
@@ -100,8 +100,13 @@ module UKPlanningScraper
         @applications = scrape_arcus(@scrape_params, options)
       when 'camden'
         @applications = scrape_northgate(@scrape_params, options)
-      when 'ocella' 
-        @applications = scrape_ocella(@scrape_params, options)
+      when 'ocella'
+        # Fallback: if the URL looks like a SystemNI URL, use SystemNI scraper
+        if @url.match?(%r{planningsystemni\.gov\.uk}i)
+          @applications = scrape_systemni(@scrape_params, options)
+        else
+          @applications = scrape_ocella(@scrape_params, options)
+        end
       when 'servlet'
         @applications = scrape_servlet(@scrape_params, options)
       when 'northgate_es'

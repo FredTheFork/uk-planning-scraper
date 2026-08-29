@@ -208,6 +208,15 @@ module Playwright
     revisions.uniq
   end
 
+  # Known chromium revisions used by various playwright-ruby-client gem
+  # versions. The gem hardcodes expected revision numbers in its compiled
+  # JavaScript driver. When the gem's expected revision differs from the
+  # Node playwright-core's browsers.json revision, we need a symlink so
+  # the gem finds the binary at the path it expects.
+  KNOWN_CHROMIUM_REVISIONS = %w[
+    1076 1084 1091 1097 1100 1112 1117 1124 1134 1140 1148 1155 1161 1169
+  ].freeze
+
   # Create symlinks for ALL missing chromium-* revision directories
   # by pointing them to the directory that has the real binary.
   # Also creates directories for revisions the gem expects but that
@@ -249,11 +258,18 @@ module Playwright
       end
     end
 
-    # Now check for revisions the gem expects that have NO directory at all
-    gem_revisions = find_gem_expected_revisions
-    gem_revisions.each do |rev|
+    # Now check for revisions the gem expects that have NO directory at all.
+    # Combine gem-scanned revisions with hardcoded known ones and also
+    # extract revision numbers from existing chromium-* directory names.
+    existing_revisions = Dir.glob(File.join(base, 'chromium-*')).map do |d|
+      File.basename(d)[/chromium-(\d+)/, 1]
+    end.compact
+
+    all_revisions = (find_gem_expected_revisions + KNOWN_CHROMIUM_REVISIONS + existing_revisions).uniq
+    all_revisions.each do |rev|
       expected_dir = File.join(base, "chromium-#{rev}")
       next if File.directory?(expected_dir) || File.symlink?(expected_dir)
+      next if expected_dir == real_dir
 
       if create_platform_link(real_dir, expected_dir)
         puts "  Created missing link #{expected_dir} -> #{real_dir}"
@@ -548,7 +564,14 @@ module Playwright
     end
     const_set(:CLI_EXECUTABLE_PATH, cli_wrapper_path)
 
-    # Step 3: Check what's missing. We must NOT return early just because
+    # Step 3: ALWAYS create symlinks for all known chromium revisions.
+    # This must happen BEFORE the early return below, because the gem may
+    # expect a different revision (e.g. chromium-1076) than what's installed
+    # (e.g. chromium-1169). Without the symlink, the gem fails with
+    # "Executable doesn't exist at chromium-1076\chrome-win\chrome.exe".
+    ensure_all_chromium_symlinks!
+
+    # Step 4: Check what's missing. We must NOT return early just because
     # Chromium exists — winldd or chromium-headless-shell may still be
     # missing, which causes "Executable doesn't exist" errors at runtime.
     chromium_ok = chromium_installed?
@@ -666,6 +689,9 @@ module Playwright
       opts
     end
 
+    patched_launch = false
+    patched_lpc = false
+
     if browser_type_class.method_defined?(:launch)
       original_launch = browser_type_class.instance_method(:launch)
 
@@ -676,6 +702,7 @@ module Playwright
         inject_exe.call(opts)
         original_launch.bind(self).call(**opts)
       end
+      patched_launch = true
     end
 
     if browser_type_class.method_defined?(:launch_persistent_context)
@@ -698,9 +725,25 @@ module Playwright
           original_lpc.bind(self).call(**opts)
         end
       end
+      patched_lpc = true
     end
 
-    puts "Patched BrowserType#launch and #launch_persistent_context to use explicit executablePath"
+    if patched_launch || patched_lpc
+      puts "Patched BrowserType#launch#{' and #launch_persistent_context' if patched_lpc} to use explicit executablePath"
+    end
+  end
+
+  # Wrap Playwright.create to re-apply the patch after the playwright
+  # instance is created (BrowserType methods may not be defined at load
+  # time but will be by the time create yields).
+  unless @playwright_create_wrapped
+    @playwright_create_wrapped = true
+    original_create = method(:create)
+
+    define_singleton_method(:create) do |*args, &block|
+      patch_browser_launch!
+      original_create.call(*args, &block)
+    end
   end
 
   # Run the full browser setup at load time.
