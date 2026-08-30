@@ -1,9 +1,11 @@
+ENV.delete('PLAYWRIGHT_BROWSERS_PATH')
 require_relative 'lib/uk_planning_scraper/playwright_compat'
 require 'pp'
 require 'fileutils'
 require 'timeout'
+require_relative 'lib/uk_planning_scraper'
+require_relative 'lib/uk_planning_scraper/servlet'
 require_relative 'lib/uk_planning_scraper/postprocess'
-ENV.delete('PLAYWRIGHT_BROWSERS_PATH')
 
 # Playwright::ensure_browser! already ran at require time via playwright_compat.rb.
 # It handles chromium, chromium-headless-shell, and winldd downloads + symlinks.

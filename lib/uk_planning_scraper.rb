@@ -14,6 +14,7 @@ require_relative 'uk_planning_scraper/systemni'
 require_relative 'uk_planning_scraper/Randoms1'
 require_relative 'uk_planning_scraper/Randoms2'
 require_relative 'uk_planning_scraper/Randoms3'
+require_relative 'uk_planning_scraper/servlet'
 require 'logger'
 
 module UKPlanningScraper
