@@ -170,6 +170,18 @@ module UKPlanningScraper
             rescue
             end
 
+            # === Fill keyword field to enable Search button ===
+            begin
+              keyword_input = page.locator('input[name="Keyword-name"]')
+              if keyword_input.count > 0
+                keyword_input.fill('0')
+                puts "✅ Filled keyword field with '0' to enable Search button"
+                page.wait_for_timeout(500)
+              end
+            rescue => e
+              puts "⚠️ Could not fill keyword field: #{e.message}"
+            end
+
             # === Click Search button ===
             search_buttons = page.query_selector_all('button:has-text("Search")')
             puts "🔍 Found #{search_buttons.size} Search buttons"
@@ -182,9 +194,15 @@ module UKPlanningScraper
               return []
             end
 
-            # Click the last Search button (typically the form submit)
-            search_buttons.last.click
-            puts "✅ Clicked Search button (index #{search_buttons.size - 1})"
+            # If the last Search button is disabled, try clicking an enabled one
+            search_btn = search_buttons.reverse.find { |btn| !btn.get_attribute('disabled') }
+            if search_btn.nil?
+              puts "⚠️ All Search buttons are disabled, trying JS click on last one"
+              search_buttons.last.click(force: true) rescue nil
+            else
+              search_btn.click
+            end
+            puts "✅ Clicked Search button"
 
             # === Wait for results ===
             begin
