@@ -30,242 +30,221 @@ module UKPlanningScraper
     end
 
     def scrape
-      authority_id = AUTHORITIES.keys.find { |k| @authority.name.include?(k) }
-      raise "Unrecognized authority for #{@authority.name}" unless authority_id
+      authority_key = AUTHORITIES.keys.find { |k| @authority.name.include?(k) }
+      unless authority_key
+        puts "❌ Unrecognized authority for #{@authority.name}"
+        return []
+      end
+
+      authority_value = AUTHORITIES[authority_key]
+      puts "🔍 Scraping SystemNI for #{@authority.name} (authority value: #{authority_value})"
 
       date_to = Date.today
       date_from = @params[:received_from] || (date_to - DAYS)
+      from_str = date_from.strftime('%d %b %Y')
+      to_str   = date_to.strftime('%d %b %Y')
+
+      puts "📅 Date range: #{from_str} → #{to_str}"
 
       apps = []
       begin
-        Timeout.timeout(900) do   # 15 minutes = 900 seconds
+        Timeout.timeout(900) do
           Playwright.create(playwright_cli_executable_path: Playwright::CLI_EXECUTABLE_PATH) do |playwright|
-            playwright.chromium.launch(headless: false) do |browser|
-              browser.new_context do |context|
-                page = context.new_page
-                page.goto(BASE_URL)
-                page.wait_for_load_state
+            browser = playwright.chromium.launch(headless: false)
+            context = browser.new_context
+            page = context.new_page
+
+            puts "🌐 Navigating to #{BASE_URL}"
+            page.goto(BASE_URL, timeout: 60_000)
+            page.wait_for_load_state
+            puts "✅ Page loaded"
+
+            # Click Continue button if present
+            begin
+              if page.query_selector('button:has-text("Continue")')
                 page.click('button:has-text("Continue")')
+                puts "✅ Clicked Continue button"
                 sleep 1
-                # ✅ Authority selection using keyboard navigation
-                page.click('button[name="authority-button"]', timeout: 10_000)
-                sleep 1
+              end
+            rescue => e
+              puts "ℹ️ No Continue button or already past it: #{e.message}"
+            end
 
-                # Wait for dropdown to open
-                page.wait_for_selector('.MultiSearchSelectstyles__DropDownSearchFilter-kdm30m-1', timeout: 10_000)
+            # === Authority selection ===
+            begin
+              page.click('button[name="authority-button"]', timeout: 10_000)
+              puts "✅ Clicked authority dropdown button"
+              sleep 1
 
-                # Get the authority value (1-10) from the hash
-                authority_key = AUTHORITIES.keys.find { |k| @authority.name.include?(k) }
-                if authority_key
-                  authority_value = AUTHORITIES[authority_key]
-                  # Click the label containing the specific checkbox input by value
-                  page.click("label:has(input[value=\"#{authority_value}\"])")
-                  puts "✅ Selected authority: #{authority_key} (value #{authority_value})"
-                else
-                  puts "⚠️ Could not determine authority for #{@authority.name}"
+              page.wait_for_selector('.MultiSearchSelectstyles__DropDownSearchFilter-kdm30m-1', timeout: 10_000)
+              page.click("label:has(input[value=\"#{authority_value}\"])")
+              puts "✅ Selected authority: #{authority_key} (value #{authority_value})"
+              sleep 0.5
+            rescue => e
+              puts "⚠️ Authority selection issue: #{e.class} - #{e.message}"
+            end
+
+            # === Fill date fields ===
+            filled_from = false
+            filled_to   = false
+
+            # 1) Primary: explicit ids field-14 (from) and field-15 (to)
+            begin
+              if page.locator('#field-14').count > 0
+                page.locator('#field-14').fill(from_str)
+                filled_from = true
+                puts "✅ Filled FROM date via #field-14 => #{from_str}"
+              end
+            rescue => e
+              puts "⚠️ #field-14 fill failed: #{e.class} - #{e.message}"
+            end
+
+            begin
+              if page.locator('#field-15').count > 0
+                page.locator('#field-15').fill(to_str)
+                filled_to = true
+                puts "✅ Filled TO date via #field-15 => #{to_str}"
+              end
+            rescue => e
+              puts "⚠️ #field-15 fill failed: #{e.class} - #{e.message}"
+            end
+
+            # 2) aria-labelledby fallback
+            unless filled_from
+              begin
+                if page.locator('input[aria-labelledby="dateFrom"]').count > 0
+                  page.locator('input[aria-labelledby="dateFrom"]').fill(from_str)
+                  filled_from = true
+                  puts "✅ Filled FROM via aria-labelledby=dateFrom"
                 end
-                # === Fill Received From / To with robust fallbacks ===
-                from_str = (date_from || Date.today - DAYS).strftime('%d %b %Y') # safe fallback if date_from missing
-                to_str   = (date_to   || Date.today).strftime('%d %b %Y')
-
-                filled_from = false
-                filled_to   = false
-
-                begin
-                  # 1) Primary: explicit ids
-                  if page.locator('#field-14').count > 0 && page.locator('#field-15').count > 0
-                    page.locator('#field-14').fill(from_str)
-                    page.locator('#field-15').fill(to_str)
-                    filled_from = filled_to = true
-                    puts "✅ Filled dates via #field-14 / #field-15 => #{from_str} → #{to_str}"
-                  end
-                rescue => e
-                  warn "⚠️ Primary id fill failed: #{e.class} - #{e.message}"
-                end
-
-                unless filled_from && filled_to
-                  begin
-                    # 2) aria-labelledby fallback
-                    if !filled_from && page.locator('input[aria-labelledby="dateFrom"]').count > 0
-                      page.locator('input[aria-labelledby="dateFrom"]').fill(from_str)
-                      filled_from = true
-                      puts "✅ Filled From via aria-labelledby=dateFrom"
-                    end
-                    if !filled_to && page.locator('input[aria-labelledby="dateTo"]').count > 0
-                      page.locator('input[aria-labelledby="dateTo"]').fill(to_str)
-                      filled_to = true
-                      puts "✅ Filled To via aria-labelledby=dateTo"
-                    end
-                  rescue => e
-                    warn "⚠️ aria-labelledby fallback failed: #{e.class} - #{e.message}"
-                  end
-                end
-
-                unless filled_from && filled_to
-                  begin
-                    # 3) placeholder-based fallback (DD MMM YYYY / DD MMM)
-                    placeholders = page.locator('input[placeholder]')
-                    placeholders.count.times do |i|
-                      el = placeholders.nth(i)
-                      ph = (el.get_attribute('placeholder') || '').to_s
-                      next if ph.empty?
-                      if !filled_from && ph.match?(/DD\s*MMM/i)
-                        el.fill(from_str)
-                        filled_from = true
-                        puts "✅ Filled From via placeholder: #{ph}"
-                      elsif !filled_to && ph.match?(/DD\s*MMM/i)
-                        # if we accidentally pick the same placeholder twice, ensure we don't overwrite the from
-                        unless filled_to
-                          el.fill(to_str)
-                          filled_to = true
-                          puts "✅ Filled To via placeholder: #{ph}"
-                        end
-                      end
-                      break if filled_from && filled_to
-                    end
-                  rescue => e
-                    warn "⚠️ placeholder fallback failed: #{e.class} - #{e.message}"
-                  end
-                end
-
-                unless filled_from && filled_to
-                  begin
-                    # 4) generic last-resort search for inputs that look like dates
-                    inputs = page.locator('input')
-                    inputs.count.times do |i|
-                      next if filled_from && filled_to
-                      el = inputs.nth(i)
-                      next unless (attr = el.get_attribute('placeholder') || el.get_attribute('aria-label') || el.get_attribute('id') || '').to_s.match?(/DD|dd|MMM|yyyy|Date|date/i)
-                      if !filled_from
-                        el.fill(from_str) rescue nil
-                        filled_from = true
-                        puts "✅ Filled From via generic input fallback (matched #{attr.inspect})"
-                      elsif !filled_to
-                        el.fill(to_str) rescue nil
-                        filled_to = true
-                        puts "✅ Filled To via generic input fallback (matched #{attr.inspect})"
-                      end
-                    end
-                  rescue => e
-                    warn "⚠️ generic input fallback failed: #{e.class} - #{e.message}"
-                  end
-                end
-
-                # final check
-                unless filled_from && filled_to
-                  warn "❌ Could not find date inputs for Received From / To. Tried multiple fallbacks."
-                else
-                  # blur active element and click body to trigger any JS validation
-                  begin
-                    page.evaluate("() => { if (document.activeElement) document.activeElement.blur(); }")
-                  rescue
-                  end
-                  begin
-                    page.click('body') rescue nil
-                  rescue
-                  end
-                  page.wait_for_timeout(700)
-                end
-
-                # === Fill dummy search term to enable search button (only if present) ===
-                begin
-                  ref_input = page.locator('input[aria-label="Reference number-input"], input[id*="reference"], input[name*="reference"]')
-                  if ref_input.count > 0
-                    ref_input.first.fill('2') rescue nil
-                    puts "✅ Filled dummy reference to enable search"
-                  else
-                    puts "ℹ️ No reference input found to fill."
-                  end
-                rescue => e
-                  warn "⚠️ Failed to fill dummy reference: #{e.class} - #{e.message}"
-                end
-
-                # short pause for UI to react
-                page.wait_for_timeout(1000)
-
-                sleep 5
-
-                # Click the SECOND Search button (index 2)
-                search_buttons = page.query_selector_all('button:has-text("Search")')
-                if search_buttons.size >= 2
-                  search_buttons[2].click
-                  puts "✅ Clicked the second Search button"
-                else
-                  puts "⚠️ Could not find the second Search button, clicking the first instead"
-                  search_buttons.first&.click
-                end
-
-                page.wait_for_selector('.ApplicationCard__StyledLink-sc-1oe3v7i-0', timeout: 30_000)
-                sleep 5
-                def click_all_show_more(page)
-                  buttons = page.query_selector_all('button.tqc-button.css-dlbz8t')
-                  puts "🟢 Found #{buttons.size} 'Show more' buttons."
-                  buttons.each_with_index do |btn, i|
-                    begin
-                      puts "➡️ Clicking 'Show more' button #{i + 1}..."
-                      btn.click
-                      sleep 1.5
-                    rescue => e
-                      puts "⚠️ Could not click button #{i + 1}: #{e.message}"
-                    end
-                  end
-                  puts "✅ All 'Show more' expansions complete."
-                end
-
-                loop do
-                  cards = page.query_selector_all('.ApplicationCard__StyledLink-sc-1oe3v7i-0')
-                  puts "Found #{cards.size} results on this page"
-
-                  cards.each do |card|
-                    begin
-                      app = Application.new
-
-                      # ✅ Extract reference number
-                      app.council_reference = card.inner_text[/Application reference:\s*(\S+)/, 1]
-
-                      # ✅ Extract address (first <p> in .css-ksgbky)
-                      app.address = card.query_selector('.css-ksgbky p')&.inner_text&.strip
-
-                      # ✅ Extract description (the actual proposal text)
-                      app.description = card.query_selector('.css-pfuuyu p')&.inner_text&.strip
-
-                      # 🧹 Clean up stray “Show more/less” text or badges if ever present
-                      app.description&.gsub!(/Show\s+(more|less)/i, '')
-                      app.description&.strip!
-
-                      # ✅ Extract received date
-                      app.date_received = card.inner_text[/Received:\s*(.+?)\n/, 1]
-
-                      # ✅ Build info URL
-                      href = card.query_selector('a')&.get_attribute('href')
-                      app.info_url = "https://planningregister.planningsystemni.gov.uk#{href}"
-
-                      # Debugging output
-                      puts "------------------------------------------------------------"
-                      puts "  Ref:        #{app.council_reference}"
-                      puts "  Address:    #{app.address}"
-                      puts "  Description:#{app.description}"
-                      puts "  Date:       #{app.date_received}"
-                      puts "  Link:       #{app.info_url}"
-                      puts "------------------------------------------------------------"
-
-                      apps << app
-                    rescue => e
-                      puts "Error parsing card: #{e}"
-                    end
-                  end
-
-
-
-                  # pagination (if "Next" exists)
-                  next_button = page.query_selector('button:has-text("Next")')
-                  break unless next_button && !next_button.get_attribute('disabled')
-
-                  next_button.click
-                  page.wait_for_selector('.ApplicationCard__StyledLink-sc-1oe3v7i-0', timeout: 20_000)
-                end
+              rescue => e
+                puts "⚠️ aria-labelledby dateFrom fill failed: #{e.message}"
               end
             end
+
+            unless filled_to
+              begin
+                if page.locator('input[aria-labelledby="dateTo"]').count > 0
+                  page.locator('input[aria-labelledby="dateTo"]').fill(to_str)
+                  filled_to = true
+                  puts "✅ Filled TO via aria-labelledby=dateTo"
+                end
+              rescue => e
+                puts "⚠️ aria-labelledby dateTo fill failed: #{e.message}"
+              end
+            end
+
+            # 3) placeholder-based fallback
+            unless filled_from && filled_to
+              begin
+                placeholders = page.locator('input[placeholder]')
+                placeholders.count.times do |i|
+                  el = placeholders.nth(i)
+                  ph = (el.get_attribute('placeholder') || '').to_s
+                  next if ph.empty?
+                  if !filled_from && ph.match?(/DD\s*MMM/i)
+                    el.fill(from_str)
+                    filled_from = true
+                    puts "✅ Filled FROM via placeholder: #{ph}"
+                  elsif !filled_to && ph.match?(/DD\s*MMM/i)
+                    el.fill(to_str)
+                    filled_to = true
+                    puts "✅ Filled TO via placeholder: #{ph}"
+                  end
+                  break if filled_from && filled_to
+                end
+              rescue => e
+                puts "⚠️ placeholder fallback failed: #{e.message}"
+              end
+            end
+
+            unless filled_from && filled_to
+              puts "❌ Could not fill all date fields (from=#{filled_from}, to=#{filled_to})"
+            end
+
+            # Blur to trigger JS validation
+            begin
+              page.evaluate("() => { if (document.activeElement) document.activeElement.blur(); }")
+              page.click('body') rescue nil
+              page.wait_for_timeout(700)
+            rescue
+            end
+
+            # === Click Search button ===
+            search_buttons = page.query_selector_all('button:has-text("Search")')
+            puts "🔍 Found #{search_buttons.size} Search buttons"
+
+            if search_buttons.empty?
+              puts "❌ No Search button found"
+              File.write("debug_output.html", page.content)
+              context.close
+              browser.close
+              return []
+            end
+
+            # Click the last Search button (typically the form submit)
+            search_buttons.last.click
+            puts "✅ Clicked Search button (index #{search_buttons.size - 1})"
+
+            # === Wait for results ===
+            begin
+              page.wait_for_selector('.ApplicationCard__StyledLink-sc-1oe3v7i-0', timeout: 30_000)
+              puts "✅ Results page loaded"
+            rescue => e
+              puts "⚠️ No results found or timeout: #{e.message}"
+              File.write("debug_output.html", page.content)
+              context.close
+              browser.close
+              return []
+            end
+
+            sleep 2
+
+            # === Parse results with pagination ===
+            loop do
+              cards = page.query_selector_all('.ApplicationCard__StyledLink-sc-1oe3v7i-0')
+              puts "Found #{cards.size} results on this page"
+
+              cards.each do |card|
+                begin
+                  app = Application.new
+                  app.authority_name = @authority.name
+
+                  app.council_reference = card.inner_text[/Application reference:\s*(\S+)/, 1]
+                  app.address = card.query_selector('.css-ksgbky p')&.inner_text&.strip
+                  app.description = card.query_selector('.css-pfuuyu p')&.inner_text&.strip
+                  app.description&.gsub!(/Show\s+(more|less)/i, '')
+                  app.description&.strip!
+
+                  app.date_received = card.inner_text[/Received:\s*(.+?)\n/, 1]
+
+                  href = card.query_selector('a')&.get_attribute('href')
+                  app.info_url = "https://planningregister.planningsystemni.gov.uk#{href}"
+
+                  puts "------------------------------------------------------------"
+                  puts "  Ref:        #{app.council_reference}"
+                  puts "  Address:    #{app.address}"
+                  puts "  Description:#{app.description}"
+                  puts "  Date:       #{app.date_received}"
+                  puts "  Link:       #{app.info_url}"
+                  puts "------------------------------------------------------------"
+
+                  apps << app
+                rescue => e
+                  puts "Error parsing card: #{e}"
+                end
+              end
+
+              # Pagination
+              next_button = page.query_selector('button:has-text("Next")')
+              break unless next_button && !next_button.get_attribute('disabled')
+
+              next_button.click
+              page.wait_for_selector('.ApplicationCard__StyledLink-sc-1oe3v7i-0', timeout: 20_000)
+            end
+
+            context.close
+            browser.close
           end
         end
       rescue Timeout::Error
@@ -273,7 +252,9 @@ module UKPlanningScraper
              "Returning partial results (#{apps.size} applications already collected)."
       rescue StandardError => e
         puts "❌ Unexpected error in SystemNI scraper for #{@authority.name}: #{e.class} - #{e.message}"
+        puts e.backtrace.first(5).join("\n")
       end
+
       puts "✅ Collected #{apps.size} applications"
       apps
     end
