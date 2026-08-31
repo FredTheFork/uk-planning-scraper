@@ -26,8 +26,6 @@ module UKPlanningScraper
 
       from_date = @params[:received_from] || @params[:validated_from] || (Date.today - (DAYS - 1))
       to_date   = @params[:received_to]   || @params[:validated_to]   || Date.today
-      from_str = from_date.strftime('%d/%m/%Y')
-      to_str   = to_date.strftime('%d/%m/%Y')
 
       apps = []
       seen_refs = Set.new
@@ -42,37 +40,92 @@ module UKPlanningScraper
             puts "🌐 Navigating to #{@base_url}"
             page.goto(@base_url, timeout: 60_000)
             page.wait_for_load_state
+            page.wait_for_timeout(1000)
 
-            # === Deselect non-planning checkboxes ===
+            # === Step 1: Accept cookie consent banner ===
+            begin
+              cookie_btn = page.query_selector('button.accept-policy.close')
+              if cookie_btn
+                cookie_btn.click(force: true)
+                page.wait_for_timeout(500)
+                puts "✔️ Clicked cookie consent Accept button"
+              end
+            rescue => e
+              puts "⚠️ Could not click cookie consent: #{e.message}"
+            end
+
+            # === Step 2: Accept disclaimer (form POST to /Disclaimer/AcceptDisclaimer) ===
+            begin
+              disclaimer_btn = page.query_selector('form[action="/Disclaimer/AcceptDisclaimer"] button[type="submit"]')
+              if disclaimer_btn
+                disclaimer_btn.click(force: true)
+                page.wait_for_load_state
+                page.wait_for_timeout(1000)
+                puts "✔️ Clicked disclaimer Accept button"
+              end
+            rescue => e
+              puts "⚠️ Could not click disclaimer: #{e.message}"
+            end
+
+            # === Step 3: Deselect non-planning checkboxes via JS ===
+            # The HTML uses checked="checked" attribute. JS evaluation is more robust
+            # than Playwright's uncheck for these ASP.NET-style checkboxes.
             %w[SearchEnforcement SearchBuildingControl SearchTreePreservationOrders].each do |id|
               begin
-                el = page.query_selector("input##{id}")
-                if el && el['checked']
-                  page.uncheck("input##{id}", force: true)
+                js = %Q{
+                  (function(){
+                    var el = document.querySelector('input##{id}');
+                    if (!el) return false;
+                    el.checked = false;
+                    el.dispatchEvent(new Event('input', {bubbles:true}));
+                    el.dispatchEvent(new Event('change', {bubbles:true}));
+                    return true;
+                  })();
+                }
+                result = page.evaluate(js)
+                if result
                   puts "✔️ Unchecked #{id}"
+                else
+                  puts "ℹ️ #{id} checkbox not present"
                 end
               rescue => e
                 puts "⚠️ Could not uncheck #{id}: #{e.message}"
               end
             end
 
-            # Ensure Planning checkbox is checked
+            # === Step 4: Ensure Planning checkbox is checked ===
             begin
-              planning_cb = page.query_selector('input#SearchPlanning')
-              if planning_cb && !planning_cb['checked']
-                page.check('input#SearchPlanning', force: true)
-                puts "✔️ Checked SearchPlanning"
-              end
+              js = %Q{
+                (function(){
+                  var el = document.querySelector('input#SearchPlanning');
+                  if (!el) return false;
+                  if (!el.checked) {
+                    el.checked = true;
+                    el.dispatchEvent(new Event('input', {bubbles:true}));
+                    el.dispatchEvent(new Event('change', {bubbles:true}));
+                  }
+                  return true;
+                })();
+              }
+              page.evaluate(js)
+              puts "✔️ Ensured SearchPlanning is checked"
             rescue => e
               puts "⚠️ Could not check SearchPlanning: #{e.message}"
             end
 
-            # === Expand Planning section if collapsed ===
+            # === Step 5: Expand Planning section if collapsed ===
             begin
               planning_summary = page.query_selector('summary:has-text("Planning")')
               if planning_summary
-                details = planning_summary.evaluate('el => el.closest("details") ? el.closest("details").open : null')
-                unless details
+                details_open = page.evaluate(%Q{
+                  (function(){
+                    var s = document.querySelector('summary:has-text("Planning")');
+                    if (!s) return null;
+                    var d = s.closest('details');
+                    return d ? d.open : null;
+                  })();
+                })
+                unless details_open
                   planning_summary.click
                   puts "✔️ Expanded Planning section"
                   page.wait_for_timeout(500)
@@ -82,32 +135,52 @@ module UKPlanningScraper
               puts "⚠️ Could not expand Planning section: #{e.message}"
             end
 
-            # === Fill date received fields ===
-            begin
-              from_input = page.locator('input#DateReceivedFrom')
-              to_input   = page.locator('input#DateReceivedTo')
+            # === Step 6: Fill date received fields ===
+            # Input type is "date" so browser expects YYYY-MM-DD format
+            from_str = from_date.strftime('%Y-%m-%d')
+            to_str   = to_date.strftime('%Y-%m-%d')
 
-              if from_input.count > 0
-                from_input.fill(from_str)
-                puts "✔️ Filled DateReceivedFrom: #{from_str}"
-              else
-                # Fallback: try by name
-                page.fill('input[name="DateReceivedFrom"]', from_str) rescue nil
-                puts "✔️ Filled DateReceivedFrom via name: #{from_str}"
+            fill_date_field = lambda do |selector, value|
+              begin
+                js = %Q{
+                  (function(){
+                    var el = document.querySelector("#{selector}");
+                    if (!el) return false;
+                    try { el.focus(); } catch(e){}
+                    el.value = "#{value}";
+                    el.dispatchEvent(new Event('input', {bubbles:true}));
+                    el.dispatchEvent(new Event('change', {bubbles:true}));
+                    try { el.blur(); } catch(e){}
+                    return true;
+                  })();
+                }
+                result = page.evaluate(js)
+                if result
+                  puts "✔️ Filled #{selector} with #{value}"
+                  return true
+                end
+                false
+              rescue => e
+                puts "⚠️ Date fill error for #{selector}: #{e.class} - #{e.message}"
+                false
               end
-
-              if to_input.count > 0
-                to_input.fill(to_str)
-                puts "✔️ Filled DateReceivedTo: #{to_str}"
-              else
-                page.fill('input[name="DateReceivedTo"]', to_str) rescue nil
-                puts "✔️ Filled DateReceivedTo via name: #{to_str}"
-              end
-            rescue => e
-              puts "⚠️ Could not fill date fields: #{e.class} - #{e.message}"
             end
 
-            # === Click Apply button ===
+            filled_from = false
+            %w[input#DateReceivedFrom input[name="DateReceivedFrom"]].each do |sel|
+              filled_from = true and break if fill_date_field.call(sel, from_str)
+            end
+            puts "⚠️ DateReceivedFrom not found" unless filled_from
+
+            filled_to = false
+            %w[input#DateReceivedTo input[name="DateReceivedTo"]].each do |sel|
+              filled_to = true and break if fill_date_field.call(sel, to_str)
+            end
+            puts "⚠️ DateReceivedTo not found" unless filled_to
+
+            page.wait_for_timeout(500)
+
+            # === Step 7: Click Apply button ===
             begin
               apply_btn = page.query_selector('input[type="submit"][value="Apply"]')
               if apply_btn
@@ -124,7 +197,7 @@ module UKPlanningScraper
               return []
             end
 
-            # === Wait for results ===
+            # === Step 8: Wait for results ===
             begin
               page.wait_for_selector('div#resultsArea div.row.searchResultsCardRow', timeout: 30_000)
               puts "✅ Results loaded"
@@ -136,7 +209,7 @@ module UKPlanningScraper
               return []
             end
 
-            # === Parse results with pagination ===
+            # === Step 9: Parse results with pagination ===
             page_num = 1
             loop do
               rows = page.query_selector_all('div#resultsArea div.row.searchResultsCardRow')
@@ -152,24 +225,23 @@ module UKPlanningScraper
                   ref_el = row.query_selector('h2.fs-6')
                   app.council_reference = ref_el&.inner_text&.strip
 
-                  # Address: from the anchor's aria-label or inner_text
+                  # Address: from the anchor's inner_text
                   link = row.query_selector('a.h5')
                   if link
                     href = link.get_attribute('href')
                     app.info_url = href ? URI.join(@base_url, href).to_s : nil
-                    # Address is the link text (may contain line breaks)
                     raw_addr = link.inner_text.strip.gsub(/\s+/, ' ')
                     app.address = raw_addr
                   end
 
-                  # Description: last col-xs-12 col-md-12 div (the proposal text)
+                  # Description: last col-xs-12 div (the proposal text)
                   desc_divs = row.query_selector_all('div.col-xs-12')
                   if desc_divs && desc_divs.size > 1
                     app.description = desc_divs[desc_divs.size - 1].inner_text.strip.gsub(/\s+/, ' ')
                   end
 
-                  # Status: second span in the h2 container
-                  spans = row.query_selector_all('h2.fs-6 ~ span, h2.fs-6 + span, div.col-xs-12 span')
+                  # Status: look for span elements near the h2
+                  spans = row.query_selector_all('h2.fs-6 ~ span, div.col-xs-12 span')
                   if spans && spans.size >= 2
                     app.status = spans[1].inner_text.strip
                   end
@@ -178,11 +250,11 @@ module UKPlanningScraper
                   seen_refs << app.council_reference
 
                   puts "------------------------------------------------------------"
-                  puts "  Ref:        #{app.council_reference}"
-                  puts "  Address:    #{app.address}"
-                  puts "  Description:#{app.description}"
-                  puts "  Status:     #{app.status}"
-                  puts "  Link:       #{app.info_url}"
+                  puts "  Ref:         #{app.council_reference}"
+                  puts "  Address:     #{app.address}"
+                  puts "  Description: #{app.description}"
+                  puts "  Status:      #{app.status}"
+                  puts "  Link:        #{app.info_url}"
                   puts "------------------------------------------------------------"
 
                   apps << app
