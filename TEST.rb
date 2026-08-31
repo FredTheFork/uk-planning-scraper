@@ -11,8 +11,8 @@ require_relative 'lib/uk_planning_scraper/postprocess'
 # It handles chromium, chromium-headless-shell, and winldd downloads + symlinks.
 # No need for a duplicated local ensure_browser! here.
 
-NAME = 'Boston'
-DAYS = 10
+NAME = 'Wyre'
+DAYS = 20
 authorities = UKPlanningScraper::Authority.named(NAME)
 applications = authorities.validated_days(DAYS).scrape
 #UKPlanningScraper::EXCELEXPORT.export(applications)
