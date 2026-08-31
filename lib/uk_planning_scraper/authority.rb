@@ -68,6 +68,10 @@ module UKPlanningScraper
               )
             }ix && @url !~ %r{development\.wiltshire\.gov\.uk/pr/s/\?[^#]*tabset-167f1}i
         @system = 'arcus'
+      elsif @url.match?(%r{planning\.northwarks\.gov\.uk}i) ||
+            @url.match?(%r{southoxfordshire\.planning-register\.co\.uk}i) ||
+            @url.match?(%r{valeofwhitehorse\.planning-register\.co\.uk}i)
+        @system = 'planningregister'
       elsif @url.match?(/\/Search\/Advanced/i) &&
             !@url.start_with?("https://webportal.ribblevalley.gov.uk/planningApplication/search/advanced")
         @system = 'advancedsearch'
@@ -111,6 +115,8 @@ module UKPlanningScraper
         @applications = scrape_servlet(@scrape_params, options)
       when 'northgate_es'
         @applications = scrape_northgate_es(@scrape_params, options)
+      when 'planningregister'
+        @applications = scrape_planningregister(@scrape_params, options)
       when 'advancedsearch'
         @applications = scrape_advancedsearch(@scrape_params, options)
       when 'randoms1'
@@ -234,6 +240,8 @@ module UKPlanningScraper
             auth.instance_variable_set(:@system, 'randoms2')
           elsif auth.tagged?('randoms3')
             auth.instance_variable_set(:@system, 'randoms3')
+          elsif auth.tagged?('planningregister')
+            auth.instance_variable_set(:@system, 'planningregister')
           end
 
         end
@@ -306,6 +314,11 @@ module UKPlanningScraper
     def scrape_randoms3(params, options)
       require_relative 'Randoms3'
       UKPlanningScraper::Randoms3Scraper.scrape(self, params, options)
+    end
+
+    def scrape_planningregister(params, options)
+      require_relative 'planningregister'
+      UKPlanningScraper::PlanningRegisterScraper.scrape(self, params, options)
     end
 
   end

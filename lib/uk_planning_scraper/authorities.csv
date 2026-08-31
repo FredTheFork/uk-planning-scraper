@@ -224,7 +224,7 @@ North Norfolk,https://idoxpa.north-norfolk.gov.uk/online-applications/search.do?
 North Northamptonshire,https://publicaccess.northnorthants.gov.uk/online-applications/search.do?action=advanced
 North Somerset,https://planning.n-somerset.gov.uk/online-applications/search.do?action=advanced
 North Tyneside,https://idoxpublicaccess.northtyneside.gov.uk/online-applications/search.do?action=advanced
-North Warwickshire,https://planning.northwarks.gov.uk/Search/Advanced
+North Warwickshire,https://planning.northwarks.gov.uk/Search/Advanced,planningregister
 North West Leicestershire,https://plans.nwleics.gov.uk/public-access/search.do?action=advanced
 North Yorkshire,https://publicaccess.northyorks.gov.uk/online-applications/search.do?action=advanced
 Northumberland,https://publicaccess.northumberland.gov.uk/online-applications/search.do?action=advanced
@@ -283,7 +283,7 @@ South Holland,https://planning.sholland.gov.uk/OcellaWeb/planningSearch
 South Kesteven,https://prod.publicaccess.southkesteven.gov.uk/online-applications/search.do?action=advanced
 South Lanarkshire,https://publicaccess.southlanarkshire.gov.uk/online-applications/search.do?action=advanced
 South Norfolk,https://info.southnorfolkandbroadland.gov.uk/online-applications/search.do?action=advanced
-South Oxfordshire,https://southoxfordshire.planning-register.co.uk/Search/Advanced
+South Oxfordshire,https://southoxfordshire.planning-register.co.uk/Search/Advanced,planningregister
 South Ribble,https://publicaccess.southribble.gov.uk/online-applications/search.do?action=advanced
 South Somerset,https://publicaccess.southsomerset.gov.uk/online-applications/search.do?action=advanced
 South Staffordshire,https://planning.sstaffs.gov.uk/online-applications/search.do?action=advanced
@@ -329,7 +329,7 @@ Trafford,https://pa.trafford.gov.uk/online-applications/search.do?action=advance
 Tunbridge Wells,https://twbcpa.midkent.gov.uk/online-applications/search.do?action=advanced
 Uttlesford,https://publicaccess.uttlesford.gov.uk/online-applications/search.do?action=advanced
 Vale of Glamorgan,https://vogonline.planning-register.co.uk/Search/Advanced
-Vale of White Horse,https://valeofwhitehorse.planning-register.co.uk/Search/Advanced
+Vale of White Horse,https://valeofwhitehorse.planning-register.co.uk/Search/Advanced,planningregister
 Wakefield,https://planning.wakefield.gov.uk/online-applications/search.do?action=advanced
 Walsall,https://planning.walsall.gov.uk/swift/apas/run/wphappcriteria.display,randoms3
 Waltham Forest,https://builtenvironment.walthamforest.gov.uk/planning/index.html?fa=search
