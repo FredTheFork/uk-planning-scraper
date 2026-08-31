@@ -22,9 +22,9 @@ Bath and North East Somerset,https://app.bathnes.gov.uk/webforms/planning/#advan
 Bedford,https://publicaccess.bedford.gov.uk/online-applications/search.do?action=advanced
 Belfast,https://planningregister.planningsystemni.gov.uk/advanced-search
 Bexley,https://pa.bexley.gov.uk/online-applications/search.do?action=advanced
-Birmingham,https://eplanning.birmingham.gov.uk/Northgate/PlanningExplorer/GeneralSearch.aspx
+Birmingham,https://planning.birmingham.gov.uk/NECSWS/ES/Presentation/Planning/OnlinePlanning/OnlinePlanningSearch/
 Blaby,https://pa.blaby.gov.uk/online-applications/search.do?action=advanced
-Blackburn with Darwen,https://planning.blackburn.gov.uk/Northgate/PlanningExplorer/KeywordsSearch.aspx
+Blackburn with Darwen,https://online.blackburn.gov.uk/planning/index.html?fa=search
 Blackpool,https://idoxpa.blackpool.gov.uk/online-applications/search.do?action=advanced
 Blaenau Gwent,https://developmentservices.blaenau-gwent.gov.uk/planning/index.html?fa=search
 Bolsover,https://publicaccess.bolsover.gov.uk/online-applications/search.do?action=advanced
@@ -38,7 +38,7 @@ Breckland,https://publicportal.breckland.gov.uk/planning/index.html?fa=search
 Brent,https://pa.brent.gov.uk/online-applications/search.do?action=advanced
 Brentwood,https://publicaccess.brentwood.gov.uk/online-applications/search.do?action=advanced
 Bridgend,https://planning.bridgend.gov.uk/Search/Planning/Advanced,randoms1
-Brighton and Hove,https://publicaccess.brighton-hove.gov.uk/online-applications/search.do?action=advanced
+Brighton and Hove,https://planningapps.brighton-hove.gov.uk/online-applications/search.do?action=advanced
 Bristol,https://pa.bristol.gov.uk/online-applications/search.do?action=advanced
 Broadland,https://info.southnorfolkandbroadland.gov.uk/online-applications/search.do?action=advanced
 Bromley,https://planningaccess.bromley.gov.uk/pr/s/register-view?c__r=Arcus_BE_Public_Register
@@ -46,12 +46,12 @@ Bromsgrove and Redditch,https://publicaccess.bromsgroveandredditch.gov.uk/online
 Broxbourne,https://planning.broxbourne.gov.uk/LPAssure/ES/Presentation/Planning/OnlinePlanning/OnlinePlanningSearch#
 Broxtowe,https://publicaccess.broxtowe.gov.uk/online-applications/search.do?action=advanced
 Buckinghamshire,https://publicaccess.buckinghamshire.gov.uk/online-applications/search.do?action=advanced
-Burnley,https://publicaccess.burnley.gov.uk/online-applications/search.do?action=advanced
+Burnley,https://burnleycouncil.my.site.com/pr/s/register-view?c__r=Arcus_BE_Public_Register
 Bury,https://planning.bury.gov.uk/online-applications/search.do?action=advanced
 Caerphilly,https://publicaccess.caerphilly.gov.uk/PublicAccess/search.do?action=advanced
 Calderdale,https://portal.calderdale.gov.uk/online-applications/search.do?action=advanced
 Cambridge,https://applications.greatercambridgeplanning.org/online-applications/search.do?action=advanced
-Cambridgeshire,https://planning.cambridgeshire.gov.uk/online-applications/search.do?action=advanced
+Cambridgeshire,https://planning.cambridgeshire.gov.uk/Search/Advanced
 Camden,https://planningrecords.camden.gov.uk/Northgate/PlanningExplorer/GeneralSearch.aspx,randoms1
 Cannock Chase,https://planning.agileapplications.co.uk/cannock/search-applications/
 Canterbury,https://pa.canterbury.gov.uk/online-applications/search.do?action=advanced
@@ -134,19 +134,16 @@ Gloucester,https://publicaccess.gloucester.gov.uk/online-applications/search.do?
 Gosport,https://publicaccess.gosport.gov.uk/online-applications/search.do?action=advanced
 Gravesham,https://plan.gravesham.gov.uk/online-applications/search.do?action=advanced
 Great Yarmouth,https://planning.great-yarmouth.gov.uk/OcellaWeb/planningSearch
-Greater Manchester,https://pa.manchester.gov.uk/online-applications/search.do?action=advanced
 Greenwich,https://planning.royalgreenwich.gov.uk/online-applications/search.do?action=advanced
 Guildford,https://publicaccess.guildford.gov.uk/online-applications/search.do?action=advanced
 Gwynedd,https://amg.gwynedd.llyw.cymru/planning/index.html?language=en&fa=search
 Hackney,https://developmentandhousing.hackney.gov.uk/planning/index.html?fa=search
 Halton,https://pa.halton.gov.uk/online-applications/search.do?action=advanced
-Hambleton,https://planning.hambleton.gov.uk/online-applications/search.do?action=advanced
-Hammersmith & Fulham,https://public-access.lbhf.gov.uk/online-applications/search.do?action=advanced
+Hammersmith & Fulham,https://property.lbhf.gov.uk/NECSWS/ES/Presentation/Planning/OnlinePlanning/OnlinePlanningSearch
 Harborough,https://pa2.harborough.gov.uk/online-applications/search.do?action=advanced
 Haringey,https://publicregister.haringey.gov.uk/pr/s/register-view?c__r=Arcus_BE_Public_Register
 Harlow,https://planningonline.harlow.gov.uk/online-applications/search.do?action=advanced
 Harrow,https://planningsearch.harrow.gov.uk/planning/index.html?fa=search&_gl=1*mp34yj*_ga*MTIwMTExNzA4My4xNzQ5MzE1NjQ4*_ga_M5S4MNQ3H6*czE3NDkzMTU2NDckbzEkZzAkdDE3NDkzMTU2NDckajYwJGwwJGgw
-Harrogate,https://publicaccess.northyorks.gov.uk/online-applications/search.do?action=advanced
 Hart,https://publicaccess.hart.gov.uk/online-applications/search.do?action=advanced
 Hartlepool,https://planning.hartlepool.gov.uk/portal/servlets/ApplicationSearchServlet
 Hastings,https://publicaccess.hastings.gov.uk/online-applications/search.do?action=advanced
@@ -164,7 +161,7 @@ Huntingdonshire,https://publicaccess.huntingdonshire.gov.uk/online-applications/
 Hyndburn,https://planning.hyndburnbc.gov.uk/Northgate/ES/Presentation/Planning/OnlinePlanning/OnlinePlanningSearch
 Inverclyde,https://planning.inverclyde.gov.uk/Online/search.do?action=advanced
 Ipswich,https://ppc.ipswich.gov.uk/appnsearch.asp,randoms2
-Isle of Anglesey,https://ioacc.my.site.com/s/pr-english?language=en_GB&tabset-8996a=0eb71,randoms2
+Isle of Anglesey,https://planning-public-register.anglesey.gov.wales/prIoA/s/register-view?language=en_GB&c__r=Arcus_BE_Public_Register
 Isle of Wight,https://publicaccess.iow.gov.uk/online-applications/search.do?action=advanced
 Isles of Scilly,https://www.scilly.gov.uk/planning-development/planning-applications,randoms2
 Islington,https://planning.agileapplications.co.uk/islington/search-applications/
@@ -189,7 +186,7 @@ Luton,https://planning.luton.gov.uk/online-applications/search.do?action=advance
 Maidstone,https://pa.midkent.gov.uk/online-applications/search.do?action=advanced
 Maldon,https://publicaccess.maldon.gov.uk/online-applications/search.do?action=advanced
 Malvern Hills,https://plan.malvernhills.gov.uk/Search/Advanced
-Manchester,https://pa.manchester.gov.uk/online-applications/search.do?action=advanced
+Manchester,https://arcusbe.manchester.gov.uk/pr/s/register-view?c__r=Arcus_BE_Public_Register
 Mansfield,https://planning.mansfield.gov.uk/online-applications/search.do?action=advanced
 Medway,https://publicaccess1.medway.gov.uk/online-applications/search.do?action=advanced
 Melton,https://pa.melton.gov.uk/online-applications/search.do?action=advanced
@@ -227,13 +224,13 @@ North Norfolk,https://idoxpa.north-norfolk.gov.uk/online-applications/search.do?
 North Northamptonshire,https://publicaccess.northnorthants.gov.uk/online-applications/search.do?action=advanced
 North Somerset,https://planning.n-somerset.gov.uk/online-applications/search.do?action=advanced
 North Tyneside,https://idoxpublicaccess.northtyneside.gov.uk/online-applications/search.do?action=advanced
-North Warwickshire,https://planning.northwarks.gov.uk/Search
+North Warwickshire,https://planning.northwarks.gov.uk/Search/Advanced
 North West Leicestershire,https://plans.nwleics.gov.uk/public-access/search.do?action=advanced
-North Yorkshire,https://publicaccess.northyorks.gov.uk/online-applications/
+North Yorkshire,https://publicaccess.northyorks.gov.uk/online-applications/search.do?action=advanced
 Northumberland,https://publicaccess.northumberland.gov.uk/online-applications/search.do?action=advanced
 Norwich,https://planning.norwich.gov.uk/online-applications/search.do?action=advanced
 Nottingham,http://publicaccess.nottinghamcity.gov.uk/online-applications/search.do?action=advanced
-Nuneaton and Bedworth,https://customer.nuneatonandbedworth.gov.uk/en/AchieveForms/?form_uri=sandbox-publish://AF-Process-bb4f1551-25f7-4c9d-9504-359555b4764c/AF-Stage-52bb890a-7580-4889-8b19-31d27fd8a3bd/definition.json&redirectlink=/en&cancelRedirectLink=/en&consentMessage=yes&noLoginPrompt=1,randoms2
+Nuneaton and Bedworth,https://idoxcloud.nuneatonandbedworth.gov.uk/planning/index.html?fa=search
 Oadby and Wigston,https://pa.oadby-wigston.gov.uk/online-applications/search.do?action=advanced
 Oldham,https://planningpa.oldham.gov.uk/online-applications/search.do?action=advanced
 Orkney Islands,https://planningandwarrant.orkney.gov.uk/online-applications/search.do?action=advanced
@@ -244,7 +241,7 @@ Perth & Kinross,https://planningapps.pkc.gov.uk/online-applications/search.do?ac
 Peterborough,https://planpa.peterborough.gov.uk/online-applications/search.do?action=advanced
 Plymouth,https://planning.plymouth.gov.uk/online-applications/search.do?action=advanced
 Portsmouth,https://publicaccess.portsmouth.gov.uk/online-applications/search.do?action=advanced
-Powys,https://pa.powys.gov.uk/online-applications/search.do?action=advanced
+Powys,https://service.powys.gov.uk/pr/s/register-view?language=en_GB&c__r=Arcus_BE_Public_Register
 Preston,https://selfservice.preston.gov.uk/service/planning/ApplicationSearch.aspx,randoms2
 Reading,https://publicregister.reading.gov.uk/pr/s/register-view?c__r=Arcus_BE_Public_Register
 Redbridge,https://planning.redbridge.gov.uk/redbridge/search-applications/
@@ -265,20 +262,18 @@ Runnymede,https://planning.runnymede.gov.uk/Northgate/PlanningExplorer/GeneralSe
 Rushcliffe,https://planningon-line.rushcliffe.gov.uk/online-applications/search.do?action=advanced
 Rushmoor,https://publicaccess.rushmoor.gov.uk/online-applications/search.do?action=advanced
 Rutland,https://publicaccess.rutland.gov.uk/online-applications/search.do?action=advanced
-Ryedale,https://planningregister.ryedale.gov.uk/caonline-applications/search.do?action=advanced
 Salford,https://salfordcitycouncil.my.site.com/pr/s/register-view?c__r=Arcus_BE_Public_Register
 Sandwell,https://webcaps.sandwell.gov.uk/publicaccess/search.do?action=advanced
 Scottish Borders,https://eplanning.scotborders.gov.uk/online-applications/search.do?action=advanced
 Sedgemoor,https://sdc.somerset.gov.uk/planning_online,randoms2
 Sefton,https://pa.sefton.gov.uk/online-applications/search.do?action=advanced
-Selby,https://public.selby.gov.uk/online-applications/search.do?action=advanced
 Sevenoaks,https://pa.sevenoaks.gov.uk/online-applications/search.do?action=advanced
 Sheffield,https://planningapps.sheffield.gov.uk/online-applications/search.do?action=advanced
 Shetland Islands,https://pa.shetland.gov.uk/online-applications/search.do?action=advanced
 Shropshire,https://pa.shropshire.gov.uk/online-applications/search.do?action=advanced
 Slough,https://planning.agileapplications.co.uk/slough/search-applications/
 Solihull,https://publicaccess.solihull.gov.uk/online-applications/search.do?action=advanced
-Somerset West and Taunton,https://www3.somersetwestandtaunton.gov.uk/asp/webpages/plan/plapplookup.asp,randoms2
+Somerset West and Taunton,https://www1.somersetwestandtaunton.gov.uk/online-applications/search.do?action=advanced
 South Ayrshire,https://publicaccess.south-ayrshire.gov.uk/online-applications/search.do?action=advanced
 South Cambridgeshire,https://applications.greatercambridgeplanning.org/online-applications/search.do?action=advanced
 South Derbyshire,https://planning.southderbyshire.gov.uk/,randoms3
@@ -288,7 +283,7 @@ South Holland,https://planning.sholland.gov.uk/OcellaWeb/planningSearch
 South Kesteven,https://prod.publicaccess.southkesteven.gov.uk/online-applications/search.do?action=advanced
 South Lanarkshire,https://publicaccess.southlanarkshire.gov.uk/online-applications/search.do?action=advanced
 South Norfolk,https://info.southnorfolkandbroadland.gov.uk/online-applications/search.do?action=advanced
-South Oxfordshire,https://data.southoxon.gov.uk/ccm/support/Main.jsp?MODULE=ApplicationCriteria&APPTYPE=ALL&TYPE=Application,randoms3	
+South Oxfordshire,https://southoxfordshire.planning-register.co.uk/Search/Advanced
 South Ribble,https://publicaccess.southribble.gov.uk/online-applications/search.do?action=advanced
 South Somerset,https://publicaccess.southsomerset.gov.uk/online-applications/search.do?action=advanced
 South Staffordshire,https://planning.sstaffs.gov.uk/online-applications/search.do?action=advanced
@@ -322,7 +317,7 @@ Telford and Wrekin,https://secure.telford.gov.uk/planningsearch/,randoms3
 Tendring,https://idox.tendringdc.gov.uk/online-applications/search.do?action=advanced
 Test Valley,https://view-applications.testvalley.gov.uk/online-applications/search.do?action=advanced
 Tewkesbury,https://tewkesbury-central.oncreate.app/w/webpage/apptracker-search,randoms3
-Thanet,https://planning.thanet.gov.uk/online-applications/search.do?action=advanced
+Thanet,https://planningandbuildingcontrol.thanet.gov.uk/planning/index.html?fa=search
 Three Rivers,https://www3.threerivers.gov.uk/online-applications/search.do?action=advanced
 Thurrock,https://regs.thurrock.gov.uk/online-applications/search.do?action=advanced
 Tonbridge and Malling,https://planning.agileapplications.co.uk/tmbc/search-applications/
@@ -334,7 +329,7 @@ Trafford,https://pa.trafford.gov.uk/online-applications/search.do?action=advance
 Tunbridge Wells,https://twbcpa.midkent.gov.uk/online-applications/search.do?action=advanced
 Uttlesford,https://publicaccess.uttlesford.gov.uk/online-applications/search.do?action=advanced
 Vale of Glamorgan,https://vogonline.planning-register.co.uk/Search/Advanced
-Vale of White Horse,https://data.whitehorsedc.gov.uk/java/support/Main.jsp?MODULE=ApplicationCriteria&TYPE=Application,randoms3
+Vale of White Horse,https://valeofwhitehorse.planning-register.co.uk/Search/Advanced
 Wakefield,https://planning.wakefield.gov.uk/online-applications/search.do?action=advanced
 Walsall,https://planning.walsall.gov.uk/swift/apas/run/wphappcriteria.display,randoms3
 Waltham Forest,https://builtenvironment.walthamforest.gov.uk/planning/index.html?fa=search
@@ -344,7 +339,6 @@ Warwick,https://planningdocuments.warwickdc.gov.uk/online-applications/search.do
 Watford,https://pa.watford.gov.uk/publicaccess/search.do?action=advanced
 Waverley,https://planning360.waverley.gov.uk:4443/planning/search-applications,randoms3
 Wealden,https://planning.wealden.gov.uk/,randoms3
-Wellingborough,https://publicaccess.wellingborough.gov.uk/online-applications/search.do?action=advanced
 Welwyn Hatfield,https://planning.welhat.gov.uk/Search/Advanced
 West Berkshire,https://publicaccess.westberks.gov.uk/online-applications/search.do?action=advanced
 West Devon,https://westdevon.planning-register.co.uk/Search/Advanced,
@@ -369,7 +363,6 @@ Worcester,https://plan.worcester.gov.uk/Search/Advanced
 Worthing,https://planning.adur-worthing.gov.uk/online-applications/search.do?action=advanced
 Wrexham,https://register.wrexham.gov.uk/pr/s/register-view?c__r=Arcus_BE_Public_Register&language=en_GB
 Wychavon,https://plan.wychavon.gov.uk/Search/Advanced
-Wycombe,https://publicaccess.wycombe.gov.uk/idoxpa-web/search.do?action=advanced
 Wyre,https://publicaccess.wyre.gov.uk/online-applications/search.do?action=advanced
 Wyre Forest,https://planningpa.wyreforestdc.gov.uk/online-applications/search.do?action=advanced
 York,https://planningaccess.york.gov.uk/online-applications/search.do?action=advanced
