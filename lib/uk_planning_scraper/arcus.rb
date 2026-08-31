@@ -55,8 +55,8 @@ module UKPlanningScraper
 
               authority_lc = @authority.name.to_s.downcase
 
-              no_change_authorities = %w[ashford folkestone salford bromley]
-              two_down_authorities = ['bracknell forest', 'erewash', 'haringey', 'milton keynes', 'reading', 'rochdale', 'wrexham']
+              no_change_authorities = %w[ashford manchester folkestone salford bromley haringey rochdale isle of anglesey]
+              two_down_authorities = ['bracknell forest', 'burnley', 'erewash', 'milton keynes', 'powys', 'reading', 'rochdale', 'wrexham']
               if no_change_authorities.any? { |a| authority_lc.include?(a) }
                 puts "ℹ️ #{@authority.name}: dropdown already correct — skipping selection."
               elsif ['epping forest', 'bracknell forest'].any? { |a| authority_lc.include?(a) }
@@ -107,6 +107,11 @@ module UKPlanningScraper
                 from_str = from_date_obj.strftime('%m/%d/%Y')
                 iso_from = from_date_obj.strftime('%Y-%m-%d')
                 puts "🔧 Adjusted Rochdale date format to MM/DD/YYYY → #{from_str}"
+              end
+              if @authority.name.downcase.include?("manchester")
+                from_str = from_date_obj.strftime('%m/%d/%Y')
+                iso_from = from_date_obj.strftime('%Y-%m-%d')
+                puts "🔧 Adjusted Manchester date format to MM/DD/YYYY → #{from_str}"
               end
               # 🟦 Special case: Epping Forest uses MM/DD/YYYY format
               if @authority.name.downcase.include?("epping forest")
