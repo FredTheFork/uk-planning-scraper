@@ -11,6 +11,13 @@
 # Usage:
 #   FENORA_SYNC_KEY="your-secret-key" \
 #     ruby sync_to_fenora.rb --db data/apps.db --batch 50 --dry-run=false
+#
+# Options:
+#   --min-score N         Minimum Fenora relevance score to send (default 10)
+#   --no-secondary        Exclude secondary leads (windows/doors in larger projects)
+#   --no-uncertain        Exclude uncertain leads (borderline/vague descriptions)
+#   --show-rejected       Print rejected applications and reasons
+#   --export-filtered FILE  Write filtered results to CSV for review
 
 require 'sqlite3'
 require 'net/http'
@@ -20,7 +27,12 @@ require 'optparse'
 require 'time'
 require 'logger'
 require 'set'
-require 'dotenv/load'
+require 'csv'
+begin
+  require 'dotenv/load'
+rescue LoadError
+  # dotenv gem not installed — rely on plain ENV vars
+end
 require_relative 'lib/uk_planning_scraper/fenora_filter'
 
 options = {
@@ -31,6 +43,7 @@ options = {
   timeout: 20,
   min_score: UKPlanningScraper::FenoraFilter::KEEP_THRESHOLD,
   include_secondary: true,
+  include_uncertain: true,
 }
 
 OptionParser.new do |o|
@@ -41,7 +54,9 @@ OptionParser.new do |o|
   o.on('--endpoint PATH', 'REST endpoint path (default /functions/ingestPlanningApps)') { |v| options[:endpoint_path] = v }
   o.on('--min-score N', Integer, 'Minimum Fenora relevance score to send (default 10)') { |v| options[:min_score] = v }
   o.on('--no-secondary', 'Exclude secondary (windows/doors in larger projects)') { options[:include_secondary] = false }
+  o.on('--no-uncertain', 'Exclude uncertain (borderline/vague descriptions)') { options[:include_uncertain] = false }
   o.on('--show-rejected', 'Print rejected applications and reasons') { options[:show_rejected] = true }
+  o.on('--export-filtered FILE', 'Write filtered results to CSV for review') { |v| options[:export_csv] = v }
 end.parse!
 
 logger = Logger.new($stdout)
@@ -74,7 +89,7 @@ logger.info "Running Fenora window/door relevance filter..."
 
 kept_rows = []
 rejected_rows = []
-stats = { relevant: 0, secondary: 0, irrelevant: 0 }
+stats = { relevant: 0, secondary: 0, uncertain: 0, irrelevant: 0 }
 
 rows.each do |row|
   result = UKPlanningScraper::FenoraFilter.evaluate(
@@ -85,31 +100,56 @@ rows.each do |row|
 
   stats[result[:category]] += 1
 
+  should_keep = false
   if result[:keep]
-    if result[:category] == :relevant
-      kept_rows << row
-    elsif result[:category] == :secondary && options[:include_secondary]
-      kept_rows << row
-    else
-      rejected_rows << { row: row, reason: result[:reason], score: result[:score], category: result[:category] }
+    case result[:category]
+    when :relevant
+      should_keep = result[:score] >= options[:min_score]
+    when :secondary
+      should_keep = options[:include_secondary] && result[:score] >= options[:min_score]
+    when :uncertain
+      should_keep = options[:include_uncertain] && result[:score] >= options[:min_score]
     end
+  end
+
+  if should_keep
+    enriched = row.dup
+    enriched['fenora_score'] = result[:score]
+    enriched['fenora_category'] = result[:category].to_s
+    kept_rows << enriched
   else
-    rejected_rows << { row: row, reason: result[:reason], score: result[:score], category: result[:category] }
+    rejected_rows << {
+      row: row,
+      reason: result[:reason],
+      score: result[:score],
+      category: result[:category],
+    }
   end
 end
 
-logger.info "Filter results: #{stats[:relevant]} relevant, #{stats[:secondary]} secondary, #{stats[:irrelevant]} irrelevant"
-logger.info "Sending #{kept_rows.size} applications (min_score=#{options[:min_score]}, include_secondary=#{options[:include_secondary]})"
+logger.info "Filter results: #{stats[:relevant]} relevant, #{stats[:secondary]} secondary, #{stats[:uncertain]} uncertain, #{stats[:irrelevant]} irrelevant"
+logger.info "Sending #{kept_rows.size} applications (min_score=#{options[:min_score]}, include_secondary=#{options[:include_secondary]}, include_uncertain=#{options[:include_uncertain]})"
 
 if options[:show_rejected] && rejected_rows.any?
   puts "\n--- Rejected applications (#{rejected_rows.size}) ---"
   rejected_rows.first(50).each do |r|
     ref = r[:row]['council_reference'] || r[:row][:council_reference] || '?'
     desc = (r[:row]['description'] || r[:row][:description] || '').to_s[0..80]
-    puts "  [#{r[:score]}] #{ref}: #{desc}..."
+    puts "  [#{r[:score]}] #{r[:category]} #{ref}: #{desc}..."
     puts "       Reason: #{r[:reason]}"
   end
   puts "..." if rejected_rows.size > 50
+end
+
+# Optional: export filtered results to CSV for review
+if options[:export_csv]
+  CSV.open(options[:export_csv], 'w') do |csv|
+    csv << %w[council_reference authority_name fenora_score fenora_category address description status]
+    kept_rows.each do |r|
+      csv << [r['council_reference'], r['authority_name'], r['fenora_score'], r['fenora_category'], r['address'], r['description']&.to_s&.[](0..200), r['status']]
+    end
+  end
+  logger.info "Exported #{kept_rows.size} filtered applications to #{options[:export_csv]}"
 end
 
 # ------------------------------------------------------------
@@ -128,14 +168,16 @@ payloads = kept_rows.map do |r|
     documents_url: r['documents_url'],
     address: r['address'],
     description: r['description'],
+    fenora_score: r['fenora_score'],
+    fenora_category: r['fenora_category'],
   }
 end
 
 if options[:dry_run]
   logger.info "Dry run enabled — would send #{payloads.size} items in batches of #{options[:batch]} to #{fenora_site}#{options[:endpoint_path]}"
   logger.info "Sample of filtered applications:"
-  payloads.first(10).each do |p|
-    puts "  #{p[:council_reference]}: #{p[:description]&.to_s&.[](0..80)}"
+  payloads.first(20).each do |p|
+    puts "  [#{p[:fenora_score]}] #{p[:fenora_category].ljust(10)} #{p[:council_reference]}: #{p[:description]&.to_s&.[](0..80)}"
   end
   exit 0
 end
